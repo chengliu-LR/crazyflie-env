@@ -20,9 +20,14 @@ class CrazyflieEnv(gym.Env):
         self.action_space = spaces.Discrete(2)
 
     def step(self, action):
-        reward = self.state + action
+        self.state += action
+        reward = self.state >= 5
+        print("reward: {}".format(reward))
         return np.array(self.state, dtype=np.float32), reward, None, {}
 
     def reset(self):
         self.state = 0
         return np.array(self.state, dtype=np.float32)
+    
+    def render(self, mode="human"):
+        print(self.state)
