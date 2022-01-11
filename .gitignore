@@ -1,3 +1,6 @@
-crazyflie_env.egg-info/
- **/__pycache__/
- *.pyc
+**/__pycache__/*
+*.egg-info/
+*.ipynb
+
+#macOS
+.DS_Store
