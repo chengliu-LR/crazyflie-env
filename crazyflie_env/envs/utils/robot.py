@@ -15,14 +15,13 @@ class Robot():
         self.gy = None
         self.vx = None
         self.vy = None
-        self.radius = 0.1
+        self.radius = 0.3
         self.v_pref = 1.0 # max velocity that can choose
         self.time_step = None
 
 
     def set_state(self, px, py, gx, gy, vx, vy, radius=None):
-        """
-        Set initial state for the robot.
+        """Set initial state for the robot.
         Param: (position_x, position_y, goal_pos_x, goal_pos_y, vel_x, vel_y, [optional] radius).
         """
         self.px = px

@@ -1,5 +1,6 @@
 **/__pycache__/*
-envs/__pycache__/*.pyc
+envs/__pycache__/
+*.pyc
 *.egg-info/
 *.ipynb
 
