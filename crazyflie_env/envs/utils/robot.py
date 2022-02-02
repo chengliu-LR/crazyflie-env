@@ -68,6 +68,9 @@ class Robot():
         self.vy = velocity[1]
 
     def compute_next_position(self, action, dt):
+        """
+        action: ActionXY
+        """
         px = self.px + action.vx * dt
         py = self.py + action.vy * dt
         return px, py
