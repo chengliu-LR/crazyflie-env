@@ -27,9 +27,10 @@ class CrazyflieEnv(gym.Env):
         # reward function
         self.success_reward = 2
         self.collision_penalty = -2.5
-        self.goal_distance_penalty_factor = -0.05
+        self.goal_distance_penalty_factor = -0.1
         self.discomfort_dist = 0.5
         self.discomfort_penalty_factor = 1
+        self.speed_penalty_factor = -0.5
     
         # simulation config
         self.square_width = 5.0 # width of the square environment
@@ -46,7 +47,8 @@ class CrazyflieEnv(gym.Env):
 
         self.obstacles = [self.front_wall, self.right_wall, self.back_wall, self.left_wall]
         #self.added_walls = [((0, -2), (-5, -2)), ((0, 2), (5, 2))]
-        self.added_walls = [((0, -2), (-5, -2))]
+        #self.added_walls = [((0, -2), (-5, -2))]
+        self.added_walls = []
 
         # visualization
         self.states = None
@@ -96,6 +98,10 @@ class CrazyflieEnv(gym.Env):
 
         reward = self.goal_distance_penalty_factor * goal_distance
 
+        speed_limit_exceeded = bool(np.abs(action.vx) > 0.5 or np.abs(action.vy) > 0.5)
+        if speed_limit_exceeded:
+            reward += self.speed_penalty_factor * np.random.binomial(1, 0.4, 1)[0]
+
         if self.global_time > self.time_limit:
             #reward = 0
             done = True
@@ -134,10 +140,10 @@ class CrazyflieEnv(gym.Env):
         x_offset = 0.11
         y_offset = 0.11
         cmap = plt.cm.get_cmap('hsv', 10)
-        robot_color = 'yellow'
+        robot_color = 'aquamarine'
         goal_color = 'red'
-        arrow_color = 'red'
-        arrow_style = patches.ArrowStyle("simple", head_length=4, head_width=2)
+        arrow_color = 'orange'
+        arrow_style = patches.ArrowStyle("simple", head_length=5, head_width=3)
 
         if mode == 'video':
             fig, ax = plt.subplots(figsize=(7, 7))
@@ -152,13 +158,13 @@ class CrazyflieEnv(gym.Env):
             goal = matlines.Line2D(xdata=[0], ydata=[3], color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
 
             # add walls if any
-            wall1 = matlines.Line2D(xdata=[0,-5], ydata=[-2,-2], color='grey')
+            #wall1 = matlines.Line2D(xdata=[0,-5], ydata=[-2,-2], color='grey')
+            #ax.add_artist(wall1)
             #wall2 = matlines.Line2D(xdata=[0,5], ydata=[1,1], color='grey')
 
             robot_ = plt.Circle(robot_positions[0], self.robot.radius, fill=True, color=robot_color)
             ax.add_artist(robot_)
             ax.add_artist(goal)
-            ax.add_artist(wall1)
             #ax.add_artist(wall2)
             plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16)
 
