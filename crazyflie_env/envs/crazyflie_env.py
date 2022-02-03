@@ -22,14 +22,15 @@ class CrazyflieEnv(gym.Env):
         self.time_limit = 25 # in seconds, not steps
         self.time_step = 0.2 # in seconds
         self.global_time = 0 # in seconds
+        self.random_init_pos = False
         self.set_robot(Robot())
 
         # reward function
         self.success_reward = 50
         self.collision_penalty = -25
-        self.goal_distance_penalty_factor = -0.2
+        self.goal_distance_penalty_factor = -2
         self.discomfort_dist = 0.5
-        self.discomfort_penalty_factor = 1
+        self.discomfort_penalty_factor = 5
     
         # simulation config
         self.square_width = 5.0 # half width of the square environment
@@ -46,7 +47,7 @@ class CrazyflieEnv(gym.Env):
 
         self.obstacles = [self.front_wall, self.right_wall, self.back_wall, self.left_wall]
         #self.added_walls = [((0, -2), (-5, -2)), ((0, 2), (5, 2))]
-        #self.added_walls = [((-2, 0), (2, 0))]
+        #self.added_walls = [((-1, 0), (1, 0))]
         self.added_walls = []
 
         # visualization
@@ -76,7 +77,7 @@ class CrazyflieEnv(gym.Env):
         return collision, dist_min
 
 
-    def reset(self, random_init_pos=False):
+    def reset(self):
         """Set robot at (0, -goal_distance) with zero initial velocity.
         Return: ObservableState(px, py, vx, vy, radius)
         """
@@ -84,7 +85,7 @@ class CrazyflieEnv(gym.Env):
         if self.robot is None:
             raise AttributeError('Robot has to be set!')
         
-        if random_init_pos:
+        if self.random_init_pos:
             # set robot position randomly, if collide, reinitialize
             initial_collision = True
             while initial_collision:
