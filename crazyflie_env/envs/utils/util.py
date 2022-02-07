@@ -96,3 +96,7 @@ def get_ranger_reflection(segments, fov=2*np.pi, n_reflections=4, max_dist=3, xy
                     ranger_reflections[i] = radius
 
     return ranger_reflections
+
+
+def load_obstacle_config(environment):
+    pass

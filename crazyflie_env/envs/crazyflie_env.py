@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as matlines
 from matplotlib import animation
 from matplotlib import patches
-from crazyflie_env.envs.utils.collision import point_to_segment_dist
+from crazyflie_env.envs.utils.util import point_to_segment_dist
 from crazyflie_env.envs.utils.state import ObservableState, FullState
 from crazyflie_env.envs.utils.action import ActionXY
 from crazyflie_env.envs.utils.robot import Robot
