@@ -1,4 +1,5 @@
 import numpy as np
+from crazyflie_env.envs.utils.obstacle import Obstacle
 
 def point_to_segment_dist(end_point_1, end_point_2, point):
     """
