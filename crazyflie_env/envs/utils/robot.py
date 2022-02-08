@@ -35,6 +35,8 @@ class Robot():
 
 
     def get_full_state(self):
+        # TODO: add ranger sensor to state
+        
         return FullState(self.px, self.py, self.vx, self.vy, self.radius, self.gx, self.gy)
     
 

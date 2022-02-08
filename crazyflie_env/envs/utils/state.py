@@ -36,6 +36,8 @@ class FullState():
         self.goal_position = (self.gx, self.gy)
         self.velocity = (self.vx, self.vy)
 
+        # TODO: add ranger sensor to observation
+
         self.state_tuple = (self.px, self.py, self.vx, self.vy, self.radius, self.gx, self.gy)
 
     def __add__(self, other):
@@ -47,7 +49,7 @@ class FullState():
     def __len__(self):
         return len(self.state_tuple)
 
-
+# Tips: Joint state can be full_state + ranger_input_state
 class JointState():
     def __init__(self, self_state, obstacle_states):
         assert isinstance(self_state, FullState)

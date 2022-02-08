@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as matlines
 from matplotlib import animation
 from matplotlib import patches
-from crazyflie_env.envs.utils.collision import point_to_segment_dist
+from crazyflie_env.envs.utils.util import point_to_segment_dist
 from crazyflie_env.envs.utils.state import ObservableState, FullState
 from crazyflie_env.envs.utils.action import ActionXY
 from crazyflie_env.envs.utils.robot import Robot
+from crazyflie_env.envs.utils.obstacle import Obstacle
 #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
 
 class CrazyflieEnv(gym.Env):
@@ -75,6 +76,11 @@ class CrazyflieEnv(gym.Env):
                 dist_min = closet_dist
         
         return collision, dist_min
+    
+    
+    # TODO: put randomly generated obstacles to the environment
+    def set_obstacles(self, obstacles):
+        pass
 
 
     def reset(self):
@@ -118,6 +124,12 @@ class CrazyflieEnv(gym.Env):
 
         reward = self.goal_distance_penalty_factor * goal_distance
 
+        speed_limit_exceeded = bool(np.abs(action.vx) > 0.5 or np.abs(action.vy) > 0.5)
+        if speed_limit_exceeded:
+            reward += self.speed_penalty_factor * np.random.binomial(1, 0.4, 1)[0]
+
+        # TODO: reward function for collision provided with rangers
+
         if self.global_time > self.time_limit:
             #reward = 0
             done = True
@@ -156,10 +168,10 @@ class CrazyflieEnv(gym.Env):
         x_offset = 0.11
         y_offset = 0.11
         cmap = plt.cm.get_cmap('hsv', 10)
-        robot_color = 'yellow'
+        robot_color = 'aquamarine'
         goal_color = 'red'
-        arrow_color = 'red'
-        arrow_style = patches.ArrowStyle("simple", head_length=4, head_width=2)
+        arrow_color = 'orange'
+        arrow_style = patches.ArrowStyle("simple", head_length=5, head_width=3)
 
         if mode == 'video':
             fig, ax = plt.subplots(figsize=(7, 7))
@@ -231,3 +243,5 @@ class CrazyflieEnv(gym.Env):
                 anim.save(output_file, writer=writer)
             else:
                 plt.show()
+
+        # TODO: Obstacle Visualization
