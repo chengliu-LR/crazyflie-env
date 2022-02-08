@@ -98,10 +98,6 @@ class CrazyflieEnv(gym.Env):
 
         reward = self.goal_distance_penalty_factor * goal_distance
 
-        speed_limit_exceeded = bool(np.abs(action.vx) > 0.5 or np.abs(action.vy) > 0.5)
-        if speed_limit_exceeded:
-            reward += self.speed_penalty_factor * np.random.binomial(1, 0.4, 1)[0]
-
         if self.global_time > self.time_limit:
             #reward = 0
             done = True
