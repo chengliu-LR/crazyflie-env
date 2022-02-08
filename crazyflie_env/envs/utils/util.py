@@ -100,4 +100,5 @@ def get_ranger_reflection(segments, fov=2*np.pi, n_reflections=4, max_dist=3, xy
 
 
 def load_obstacle_config(environment):
+    # TODO: (can be randomly) generate a desired env with obstacles
     pass

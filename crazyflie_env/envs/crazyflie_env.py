@@ -11,6 +11,7 @@ from crazyflie_env.envs.utils.util import point_to_segment_dist
 from crazyflie_env.envs.utils.state import ObservableState, FullState
 from crazyflie_env.envs.utils.action import ActionXY
 from crazyflie_env.envs.utils.robot import Robot
+from crazyflie_env.envs.utils.obstacle import Obstacle
 #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
 
 class CrazyflieEnv(gym.Env):
@@ -59,6 +60,11 @@ class CrazyflieEnv(gym.Env):
         self.robot.time_step = self.time_step
 
 
+    # TODO: put randomly generated obstacles to the environment
+    def set_obstacles(self, obstacles):
+        pass
+
+
     def reset(self):
         """Set robot at the center of the environment with zero initial velocity.
         Return: ObservableState(px, py, vx, vy, radius)
@@ -101,6 +107,8 @@ class CrazyflieEnv(gym.Env):
         speed_limit_exceeded = bool(np.abs(action.vx) > 0.5 or np.abs(action.vy) > 0.5)
         if speed_limit_exceeded:
             reward += self.speed_penalty_factor * np.random.binomial(1, 0.4, 1)[0]
+
+        # TODO: reward function for collision provided with rangers
 
         if self.global_time > self.time_limit:
             #reward = 0
@@ -214,3 +222,5 @@ class CrazyflieEnv(gym.Env):
                 anim.save(output_file, writer=writer)
             else:
                 plt.show()
+
+        # TODO: Obstacle Visualization
