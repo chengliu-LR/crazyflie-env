@@ -22,7 +22,7 @@ class CrazyflieEnv(gym.Env):
         self.time_limit = 25 # in seconds, not steps
         self.time_step = 0.2 # in seconds
         self.global_time = 0 # in seconds
-        self.random_init_pos = False
+        self.random_init = True # randomly initialize robot position
         self.set_robot(Robot())
 
         # reward function
@@ -31,10 +31,9 @@ class CrazyflieEnv(gym.Env):
         self.goal_distance_penalty_factor = -2
         self.discomfort_dist = 0.5
         self.discomfort_penalty_factor = 5
-    
         # simulation config
-        self.square_width = 5.0 # half width of the square environment
-        self.goal_distance = 3.0 # initial distance to goal pos
+        self.square_width = 3.0 # half width of the square environment
+        self.goal_distance = 2.0 # initial distance to goal pos
         self.UP_RIGHT = (self.square_width, self.square_width)
         self.BOTTOM_RIGHT = (self.square_width, -self.square_width)
         self.BOTTOM_LEFT = (-self.square_width, -self.square_width)
@@ -45,10 +44,11 @@ class CrazyflieEnv(gym.Env):
         self.back_wall = (self.BOTTOM_RIGHT, self.BOTTOM_LEFT)
         self.left_wall = (self.BOTTOM_LEFT, self.UP_LEFT)
 
-        self.obstacles = [self.front_wall, self.right_wall, self.back_wall, self.left_wall]
+        self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall]
         #self.added_walls = [((0, -2), (-5, -2)), ((0, 2), (5, 2))]
         #self.added_walls = [((-1, 0), (1, 0))]
         self.added_walls = []
+        self.obstacles = None
 
         # visualization
         self.states = None
@@ -65,12 +65,12 @@ class CrazyflieEnv(gym.Env):
         """
         dist_min = float('inf')
         collision = False
-        for i, obstacle in enumerate(self.obstacles + self.added_walls):
-            closet_dist = point_to_segment_dist(obstacle[0], obstacle[1], position) - self.robot.radius
-        
+        for i, wall in enumerate(self.walls + self.added_walls):
+            closet_dist = point_to_segment_dist(wall[0], wall[1], position) - self.robot.radius
+
             if closet_dist < 0:
                 collision = True
-                break
+                return collision, dist_min
             elif closet_dist < dist_min:
                 dist_min = closet_dist
         
@@ -85,7 +85,7 @@ class CrazyflieEnv(gym.Env):
         if self.robot is None:
             raise AttributeError('Robot has to be set!')
         
-        if self.random_init_pos:
+        if self.random_init:
             # set robot position randomly, if collide, reinitialize
             initial_collision = True
             while initial_collision:
@@ -164,14 +164,14 @@ class CrazyflieEnv(gym.Env):
         if mode == 'video':
             fig, ax = plt.subplots(figsize=(7, 7))
             ax.tick_params(labelsize=16)
-            ax.set_xlim(-5, 5)
-            ax.set_ylim(-5, 5)
+            ax.set_xlim(-self.square_width, self.square_width)
+            ax.set_ylim(-self.square_width, self.square_width)
             ax.set_xlabel('x(m)', fontsize=16)
             ax.set_ylabel('y(m)', fontsize=16)
             
             # add robot and its goal
             robot_positions = [state.position for state in self.states]
-            goal = matlines.Line2D(xdata=[0], ydata=[3], color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
+            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance], color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
 
             # add walls if any
             if len(self.added_walls) != 0:
