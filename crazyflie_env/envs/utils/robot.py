@@ -15,7 +15,7 @@ class Robot():
         self.gy = None
         self.vx = None
         self.vy = None
-        self.radius = 0.3
+        self.radius = 0.1
         self.v_pref = 1.0 # max velocity that can choose
         self.time_step = None
 

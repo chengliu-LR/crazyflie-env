@@ -21,7 +21,7 @@ class CrazyflieEnv(gym.Env):
         """Agent is controlled by a known and learnable policy.
         """
         self.time_limit = 25 # in seconds, not steps
-        self.time_step = 0.2 # in seconds
+        self.time_step = 0.05 # in seconds
         self.global_time = 0 # in seconds
         self.random_init = True # randomly initialize robot position
         self.set_robot(Robot())
@@ -195,7 +195,7 @@ class CrazyflieEnv(gym.Env):
             plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16)
 
             # add time annotation
-            time_annotation = plt.text(-1, 5, 'Time: {}'.format(0), fontsize=16)
+            time_annotation = plt.text(-1, self.square_width + 0.2, 'Time: {}'.format(0), fontsize=16)
             ax.add_artist(time_annotation)
             # compute orientation, use arrow to show the direction
             radius = self.robot.radius
@@ -209,6 +209,7 @@ class CrazyflieEnv(gym.Env):
 
             for arrow in arrows: # only a robot in this case
                 ax.add_artist(arrow)
+            
             global_step = 0
             
             def update(frame_num):
