@@ -35,6 +35,8 @@ class Robot():
 
 
     def get_full_state(self):
+        # TODO: add ranger sensor to state
+        
         return FullState(self.px, self.py, self.vx, self.vy, self.radius, self.gx, self.gy)
     
 
@@ -68,6 +70,9 @@ class Robot():
         self.vy = velocity[1]
 
     def compute_next_position(self, action, dt):
+        """
+        action: ActionXY
+        """
         px = self.px + action.vx * dt
         py = self.py + action.vy * dt
         return px, py
