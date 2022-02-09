@@ -34,7 +34,7 @@ def connect_segments(segments, resolution=0.01):
     pass
 
 
-def _get_intersection(a1, a2, b1, b2):
+def get_intersection(a1, a2, b1, b2):
     """
     param a1: np.array(x1, y1) line segment 1 - starting point
     param a2: np.array(x1', y1') line segment 1 - ending point
@@ -90,7 +90,7 @@ def get_ranger_reflection(segments, fov=2*np.pi, n_reflections=4, max_dist=3, xy
         xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:]) # start and end points of each segment
         for i, theta in enumerate(angles):
             max_xy_ranger = xy_robot + np.array([max_dist * np.cos(theta), max_dist * np.sin(theta)])
-            intersection = _get_intersection(xy_start, xy_end, xy_robot, max_xy_ranger)
+            intersection = get_intersection(xy_start, xy_end, xy_robot, max_xy_ranger)
             if intersection is not None:
                 radius = np.sqrt(np.sum(intersection - xy_robot) ** 2)
                 if radius < ranger_reflections[i]:

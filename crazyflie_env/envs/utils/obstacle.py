@@ -2,8 +2,9 @@ import numpy as np
 
 class Obstacle():
     """
-    Static rectangular obstacle.
-    E.g. boxes, walls.
+    Static rectangular obstacle, given the centroid and dimension of the obstacle,
+    Return the segment points. E.g. Boxes, walls.
+    TODO: Cylinders.
     """
     def __init__(self, centroid, wx, wy, angle=0):
         """
@@ -18,7 +19,7 @@ class Obstacle():
         self.angle = angle
 
     
-    def _get_points(self, centroid):
+    def get_all_segments(self, centroid):
         """
         return: A wall ((x1, y1, x1', y1'))
                 Or a box: ((x1,y1,x1',y1'), (x2,y2,x2',y2'), (x3,y3,x3',y3'), (x4,y4,x4',y4'))

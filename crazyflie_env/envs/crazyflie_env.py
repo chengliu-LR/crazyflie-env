@@ -46,20 +46,32 @@ class CrazyflieEnv(gym.Env):
         self.back_wall = (self.BOTTOM_RIGHT, self.BOTTOM_LEFT)
         self.left_wall = (self.BOTTOM_LEFT, self.UP_LEFT)
 
+        # walls and obstacles to avoid
         self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall]
-        #self.added_walls = [((0, -2), (-5, -2)), ((0, 2), (5, 2))]
-        #self.added_walls = [((-1, 0), (1, 0))]
-        self.added_walls = []
-        self.obstacles = None
+        self.obstacles = self.set_obstacles(num_obs=1) # list of segments (x1, y1, x1', y1')
 
         # visualization
         self.states = None
-        self.action_values = None
 
+    # TODO: incorporate this to reset()
     def set_robot(self, robot):
         self.robot = robot
         self.robot.time_step = self.time_step
 
+
+    # TODO: put randomly generated obstacles to the environment
+    def set_obstacles(self, num_obs=1):
+        all_obstacles = []
+        all_segments = []
+        for i in range(num_obs):
+            obs_i = Obstacle((0, 0), 1, 1)
+            all_obstacles.append(obs_i)
+        for obs_i in all_obstacles:
+            seg_obs_i = obs_i.get_all_segments(obs_i.centroid)
+            for seg in seg_obs_i:
+                all_segments.append(seg)
+
+        return all_segments
 
     def check_collision(self, position):
         """
@@ -67,8 +79,9 @@ class CrazyflieEnv(gym.Env):
         """
         dist_min = float('inf')
         collision = False
-        for i, wall in enumerate(self.walls + self.added_walls):
-            closet_dist = point_to_segment_dist(wall[0], wall[1], position) - self.robot.radius
+        # TODO: First check walls, then check obstacles
+        for i, obstacle in enumerate(self.walls + self.obstacles):
+            closet_dist = point_to_segment_dist(obstacle[0], obstacle[1], position) - self.robot.radius
 
             if closet_dist < 0:
                 collision = True
@@ -77,11 +90,6 @@ class CrazyflieEnv(gym.Env):
                 dist_min = closet_dist
         
         return collision, dist_min
-    
-    
-    # TODO: put randomly generated obstacles to the environment
-    def set_obstacles(self, obstacles):
-        pass
 
 
     def reset(self):
@@ -170,7 +178,10 @@ class CrazyflieEnv(gym.Env):
         arrow_color = 'orange'
         arrow_style = patches.ArrowStyle("simple", head_length=5, head_width=3)
 
-        if mode == 'video':
+        if mode == 'trajectory':
+            pass
+
+        elif mode == 'video':
             fig, ax = plt.subplots(figsize=(7, 7))
             ax.tick_params(labelsize=16)
             ax.set_xlim(-self.square_width, self.square_width)
@@ -182,11 +193,10 @@ class CrazyflieEnv(gym.Env):
             robot_positions = [state.position for state in self.states]
             goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance], color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
 
-            # add walls if any
-            if len(self.added_walls) != 0:
-                wall1 = matlines.Line2D(xdata=[*zip(*self.added_walls[0])][0], ydata=[*zip(*self.added_walls[0])][1], color='grey')
-                ax.add_artist(wall1)
-            #wall2 = matlines.Line2D(xdata=[0,5], ydata=[1,1], color='grey')
+            # add obstacles
+            # if len(self.obstacles) != 0:
+            #     obstacle = matlines.Line2D(xdata=[*zip(*self.obstacles[0])][0], ydata=[*zip(*self.obstacles[0])][1], color='grey')
+            #     ax.add_artist(obstacle)
 
             robot_ = plt.Circle(robot_positions[0], self.robot.radius, fill=True, color=robot_color)
             ax.add_artist(robot_)
@@ -207,7 +217,7 @@ class CrazyflieEnv(gym.Env):
             # at time zero
             arrows = [patches.FancyArrowPatch(*orientation[0], color=arrow_color, arrowstyle=arrow_style)]
 
-            for arrow in arrows: # only a robot in this case
+            for arrow in arrows: # only one robot in this case, can be further incorporate with multi-agents
                 ax.add_artist(arrow)
             
             global_step = 0
