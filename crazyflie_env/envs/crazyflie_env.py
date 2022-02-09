@@ -32,6 +32,7 @@ class CrazyflieEnv(gym.Env):
         self.goal_distance_penalty_factor = -2
         self.discomfort_dist = 0.5
         self.discomfort_penalty_factor = 5
+
         # simulation config
         self.square_width = 3.0 # half width of the square environment
         self.goal_distance = 2.0 # initial distance to goal pos
@@ -123,10 +124,6 @@ class CrazyflieEnv(gym.Env):
         goal_reached = goal_distance < self.robot.radius
 
         reward = self.goal_distance_penalty_factor * goal_distance
-
-        speed_limit_exceeded = bool(np.abs(action.vx) > 0.5 or np.abs(action.vy) > 0.5)
-        if speed_limit_exceeded:
-            reward += self.speed_penalty_factor * np.random.binomial(1, 0.4, 1)[0]
 
         # TODO: reward function for collision provided with rangers
 
