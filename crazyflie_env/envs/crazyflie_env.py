@@ -195,7 +195,7 @@ class CrazyflieEnv(gym.Env):
             plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16)
 
             # add time annotation
-            time_annotation = plt.text(-1, self.square_width + 0.2, 'Time: {}'.format(0), fontsize=16)
+            time_annotation = plt.text(-0.5, self.square_width + 0.2, 'Time: {}'.format(0), fontsize=16)
             ax.add_artist(time_annotation)
             # compute orientation, use arrow to show the direction
             radius = self.robot.radius
@@ -211,7 +211,7 @@ class CrazyflieEnv(gym.Env):
                 ax.add_artist(arrow)
             
             global_step = 0
-            
+
             def update(frame_num):
                 nonlocal global_step
                 nonlocal arrows
