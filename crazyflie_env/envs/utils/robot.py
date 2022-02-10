@@ -75,7 +75,7 @@ class Robot():
         """
         px = self.px + action.vx * dt
         py = self.py + action.vy * dt
-        return px, py
+        return px, py # implicitly return a tuple instead of two values
 
 
     def validate_action(self, action):

@@ -3,6 +3,6 @@ envs/__pycache__/
 *.pyc
 *.egg-info/
 *.ipynb
-
+*.gif
 #macOS
 .DS_Store

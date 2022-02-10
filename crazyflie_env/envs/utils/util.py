@@ -40,7 +40,7 @@ def get_intersection(a1, a2, b1, b2):
     param a2: np.array(x1', y1') line segment 1 - ending point
     param b1: np.array(x2, y2) line segment 2 - starting point
     param b2: np.array(x2', y2') line segment 2 - ending point
-    return: point of intersection (if intersect); None (if not intersect)
+    return: np.array, point of intersection (if intersect); None (if not intersect)
     """
 
     def perp(a):

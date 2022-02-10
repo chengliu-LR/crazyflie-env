@@ -24,7 +24,7 @@ class CrazyflieEnv(gym.Env):
         self.time_step = 0.05 # in seconds
         self.global_time = 0 # in seconds
         self.random_init = True # randomly initialize robot position
-        self.set_robot(Robot())
+        self._set_robot(Robot())
 
         # reward function
         self.success_reward = 50
@@ -41,37 +41,33 @@ class CrazyflieEnv(gym.Env):
         self.BOTTOM_LEFT = (-self.square_width, -self.square_width)
         self.UP_LEFT = (-self.square_width, self.square_width)
 
-        self.front_wall = (self.UP_LEFT, self.UP_RIGHT)
-        self.right_wall = (self.UP_RIGHT, self.BOTTOM_RIGHT)
-        self.back_wall = (self.BOTTOM_RIGHT, self.BOTTOM_LEFT)
-        self.left_wall = (self.BOTTOM_LEFT, self.UP_LEFT)
+        self.front_wall = (self.UP_LEFT[0], self.UP_LEFT[1], self.UP_RIGHT[0], self.UP_RIGHT[1])
+        self.right_wall = (self.UP_RIGHT[0], self.UP_RIGHT[1], self.BOTTOM_RIGHT[0], self.BOTTOM_RIGHT[1])
+        self.back_wall = (self.BOTTOM_RIGHT[0], self.BOTTOM_RIGHT[1], self.BOTTOM_LEFT[0], self.BOTTOM_LEFT[1])
+        self.left_wall = (self.BOTTOM_LEFT[0], self.BOTTOM_LEFT[1], self.UP_LEFT[0], self.UP_LEFT[1])
 
         # walls and obstacles to avoid
-        self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall]
-        self.obstacles = self.set_obstacles(num_obs=1) # list of segments (x1, y1, x1', y1')
+        self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall] # ((x1, y1), (x1', y1'))
+        self.obstacles = []
+        self.obstacle_segments = self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         # visualization
         self.states = None
 
     # TODO: incorporate this to reset()
-    def set_robot(self, robot):
+    def _set_robot(self, robot):
         self.robot = robot
         self.robot.time_step = self.time_step
 
 
-    # TODO: put randomly generated obstacles to the environment
-    def set_obstacles(self, num_obs=1):
-        all_obstacles = []
-        all_segments = []
-        for i in range(num_obs):
-            obs_i = Obstacle((0, 0), 1, 1)
-            all_obstacles.append(obs_i)
-        for obs_i in all_obstacles:
-            seg_obs_i = obs_i.get_all_segments(obs_i.centroid)
-            for seg in seg_obs_i:
-                all_segments.append(seg)
+    def obstacles2segments(self, obstacles=[]):
+        segments = []
+        for obstacle in obstacles:
+            segment = obstacle.get_segments(obstacle.centroid)
+            segments += segment
 
-        return all_segments
+        return segments
+
 
     def check_collision(self, position):
         """
@@ -80,8 +76,9 @@ class CrazyflieEnv(gym.Env):
         dist_min = float('inf')
         collision = False
         # TODO: First check walls, then check obstacles
-        for i, obstacle in enumerate(self.walls + self.obstacles):
-            closet_dist = point_to_segment_dist(obstacle[0], obstacle[1], position) - self.robot.radius
+        for i, segment in enumerate(self.walls + self.obstacle_segments):
+            xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:])
+            closet_dist = point_to_segment_dist(xy_start, xy_end, position) - self.robot.radius
 
             if closet_dist < 0:
                 collision = True
@@ -93,13 +90,19 @@ class CrazyflieEnv(gym.Env):
 
 
     def reset(self):
-        """Set robot at (0, -goal_distance) with zero initial velocity.
-        Return: ObservableState(px, py, vx, vy, radius)
+        """
+        Set obstacles in env.
+        Set robot at (0, -goal_distance) with zero initial velocity.
+        Return: FullState
         """
         self.global_time = 0
         if self.robot is None:
             raise AttributeError('Robot has to be set!')
         
+        # TODO: put randomly generated obstacles to the environment
+        self.obstacles = [Obstacle((0, 0), 1, 1), Obstacle((1, 2), 0.1, 1.0, angle=np.pi * 3/4)]
+        self.obstacle_segments = self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
+
         if self.random_init:
             # set robot position randomly, if collide, reinitialize
             initial_collision = True
@@ -170,8 +173,6 @@ class CrazyflieEnv(gym.Env):
 
     def render(self, mode='video', output_file=None):
         #plt.rcParams['animation.ffmpeg_path'] = '/usr/local/bin/ffmpeg'
-        x_offset = 0.11
-        y_offset = 0.11
         cmap = plt.cm.get_cmap('hsv', 10)
         robot_color = 'aquamarine'
         goal_color = 'red'
@@ -182,43 +183,40 @@ class CrazyflieEnv(gym.Env):
             pass
 
         elif mode == 'video':
-            fig, ax = plt.subplots(figsize=(7, 7))
+            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white')
             ax.tick_params(labelsize=16)
             ax.set_xlim(-self.square_width, self.square_width)
             ax.set_ylim(-self.square_width, self.square_width)
             ax.set_xlabel('x(m)', fontsize=16)
             ax.set_ylabel('y(m)', fontsize=16)
-            
-            # add robot and its goal
+
+            # set robot positions and its orientation as a representation of its velocity direction at each time step
             robot_positions = [state.position for state in self.states]
-            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance], color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
-
-            # add obstacles
-            # if len(self.obstacles) != 0:
-            #     obstacle = matlines.Line2D(xdata=[*zip(*self.obstacles[0])][0], ydata=[*zip(*self.obstacles[0])][1], color='grey')
-            #     ax.add_artist(obstacle)
-
-            robot_ = plt.Circle(robot_positions[0], self.robot.radius, fill=True, color=robot_color)
-            ax.add_artist(robot_)
-            ax.add_artist(goal)
-            #ax.add_artist(wall2)
-            plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16)
-
-            # add time annotation
-            time_annotation = plt.text(-0.5, self.square_width + 0.2, 'Time: {}'.format(0), fontsize=16)
-            ax.add_artist(time_annotation)
-            # compute orientation, use arrow to show the direction
             radius = self.robot.radius
             orientation = []
             for state in self.states:
                 theta = np.arctan2(state.vy, state.vx)
                 orientation.append(((state.px, state.py), (state.px + radius * np.cos(theta), state.py + radius * np.sin(theta))))
 
-            # at time zero
-            arrows = [patches.FancyArrowPatch(*orientation[0], color=arrow_color, arrowstyle=arrow_style)]
+            # TODO: Laser Visualization
 
+            # set obstacles
+            obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi) for obs in self.obstacles]
+            for obstacle_ in obstacles_:
+                ax.add_artist(obstacle_)
+
+            # set robot, goal pos, arrows of each robot and time annotation at timestep 0
+            robot_ = plt.Circle(robot_positions[0], radius, fill=True, color=robot_color)
+            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance], color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
+            arrows = [patches.FancyArrowPatch(*orientation[0], color=arrow_color, arrowstyle=arrow_style)]
+            time_annotation = plt.text(-0.5, self.square_width + 0.2, 'Time: {}'.format(0), fontsize=16)
+
+            ax.add_artist(robot_)
+            ax.add_artist(goal)
             for arrow in arrows: # only one robot in this case, can be further incorporate with multi-agents
                 ax.add_artist(arrow)
+            ax.add_artist(time_annotation)
+            plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16)
             
             global_step = 0
 
@@ -251,5 +249,3 @@ class CrazyflieEnv(gym.Env):
                 anim.save(output_file, writer=writer)
             else:
                 plt.show()
-
-        # TODO: Obstacle Visualization
