@@ -8,7 +8,7 @@ import matplotlib.lines as matlines
 from matplotlib import animation
 from matplotlib import patches
 from crazyflie_env.envs.utils.util import point_to_segment_dist
-from crazyflie_env.envs.utils.state import ObservableState, FullState
+from crazyflie_env.envs.utils.state import FullState
 from crazyflie_env.envs.utils.action import ActionXY
 from crazyflie_env.envs.utils.robot import Robot
 from crazyflie_env.envs.utils.obstacle import Obstacle
@@ -49,34 +49,35 @@ class CrazyflieEnv(gym.Env):
         # walls and obstacles to avoid
         self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall] # ((x1, y1), (x1', y1'))
         self.obstacles = []
-        self.obstacle_segments = self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
+        self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         # visualization
         self.states = None
 
-    # TODO: incorporate this to reset()
+
     def _set_robot(self, robot):
         self.robot = robot
         self.robot.time_step = self.time_step
 
 
     def obstacles2segments(self, obstacles=[]):
-        segments = []
-        for obstacle in obstacles:
-            segment = obstacle.get_segments(obstacle.centroid)
-            segments += segment
+        all_segments = []
+        if obstacles is not None:
+            for obstacle in obstacles:
+                segments_each_obs = obstacle.get_segments()
+                all_segments += segments_each_obs
 
-        return segments
+        return all_segments
 
 
     def check_collision(self, position):
         """
-        position: np.array
+        position: np.array, current robot position
         """
         dist_min = float('inf')
         collision = False
-        # TODO: First check walls, then check obstacles
-        for i, segment in enumerate(self.walls + self.obstacle_segments):
+
+        for i, segment in enumerate(self.obstacle_segments):
             xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:])
             closet_dist = point_to_segment_dist(xy_start, xy_end, position) - self.robot.radius
 
@@ -100,11 +101,12 @@ class CrazyflieEnv(gym.Env):
             raise AttributeError('Robot has to be set!')
         
         # TODO: put randomly generated obstacles to the environment
-        self.obstacles = [Obstacle((0, 0), 1, 1), Obstacle((1, 2), 0.1, 1.0, angle=np.pi * 3/4)]
-        self.obstacle_segments = self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
+        self.obstacles = [Obstacle((0, 0), 0.5, 0.5), Obstacle((1, 2), 0.5, 0.5, angle=np.pi * 3/4)]
+        self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         if self.random_init:
             # set robot position randomly, if collide, reinitialize
+            # TODO: consider initialize inside an obstacle
             initial_collision = True
             while initial_collision:
                 initial_position = np.random.uniform(-self.square_width, self.square_width, size=2)
@@ -112,7 +114,9 @@ class CrazyflieEnv(gym.Env):
             assert initial_collision is False
         else:
             initial_position = np.array([0, -self.goal_distance])
-        self.robot.set_state(initial_position[0], initial_position[1], 0, self.goal_distance, 0, 0) # set initial pos, goal point and vel
+        
+        # TODO: randomly initialize goal position
+        self.robot.set_state(initial_position[0], initial_position[1], 0, self.goal_distance, 0, 0, self.obstacle_segments)
         self.states = list()
         ob = self.robot.get_full_state()
 
@@ -126,20 +130,17 @@ class CrazyflieEnv(gym.Env):
         """
 
         # collision detection
-        # can use 353 in crowd_sim.py to detect collisions between the robot and a cylinder obstacle.
-        next_position = np.array(self.robot.compute_next_position(action, self.time_step))
+        next_position = self.robot.compute_next_position(action, self.time_step)
         collision, dist_min = self.check_collision(next_position)
 
         # check if reaching the goal
-        goal_distance = np.linalg.norm(next_position - np.array(self.robot.get_goal_position()))
+        goal_distance = np.linalg.norm(next_position - self.robot.get_goal_position())
         goal_reached = goal_distance < self.robot.radius
 
         reward = self.goal_distance_penalty_factor * goal_distance
 
         # TODO: reward function for collision provided with rangers
-
         if self.global_time > self.time_limit:
-            #reward = 0
             done = True
             info = "Timeout"
         elif collision:
@@ -155,7 +156,6 @@ class CrazyflieEnv(gym.Env):
             done = False
             info = "Danger"
         else:
-            #reward = self.goal_distance_penalty_factor * goal_distance
             done = False
             info = "Nothing"
         
@@ -163,7 +163,7 @@ class CrazyflieEnv(gym.Env):
             # store for visualization
             self.states.append(self.robot.get_full_state())
             # update agents
-            self.robot.step(action)
+            self.robot.step(action, self.obstacle_segments)
             self.global_time += self.time_step
 
             ob = self.robot.get_full_state()
@@ -174,7 +174,8 @@ class CrazyflieEnv(gym.Env):
     def render(self, mode='video', output_file=None):
         #plt.rcParams['animation.ffmpeg_path'] = '/usr/local/bin/ffmpeg'
         cmap = plt.cm.get_cmap('hsv', 10)
-        robot_color = 'aquamarine'
+        robot_color = 'lime'
+        laser_color = 'aquamarine'
         goal_color = 'red'
         arrow_color = 'orange'
         arrow_style = patches.ArrowStyle("simple", head_length=5, head_width=3)
@@ -190,25 +191,39 @@ class CrazyflieEnv(gym.Env):
             ax.set_xlabel('x(m)', fontsize=16)
             ax.set_ylabel('y(m)', fontsize=16)
 
-            # set robot positions and its orientation as a representation of its velocity direction at each time step
+            # set robot positions and its directions_vector as a representation of its velocity directions_vector at each time step
             robot_positions = [state.position for state in self.states]
             radius = self.robot.radius
-            orientation = []
+            directions_vector = []
             for state in self.states:
                 theta = np.arctan2(state.vy, state.vx)
-                orientation.append(((state.px, state.py), (state.px + radius * np.cos(theta), state.py + radius * np.sin(theta))))
-
-            # TODO: Laser Visualization
+                directions_vector.append(((state.px, state.py), (state.px + radius * np.cos(theta), state.py + radius * np.sin(theta))))
 
             # set obstacles
             obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi) for obs in self.obstacles]
             for obstacle_ in obstacles_:
                 ax.add_artist(obstacle_)
+            
+            # get ranger reflections at each time step
+            ranger_reflectionss = [state.ranger_reflections for state in self.states]
 
-            # set robot, goal pos, arrows of each robot and time annotation at timestep 0
+            # set robot, goal pos, arrows of each robot, ranger reflections and time annotation at timestep 0
             robot_ = plt.Circle(robot_positions[0], radius, fill=True, color=robot_color)
-            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance], color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
-            arrows = [patches.FancyArrowPatch(*orientation[0], color=arrow_color, arrowstyle=arrow_style)]
+            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance],
+                                   color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
+            arrows = [patches.FancyArrowPatch(*directions_vector[0], color=arrow_color, arrowstyle=arrow_style)]
+
+            fov = 2*np.pi
+            angles = np.linspace(self.robot.theta_orientation, self.robot.theta_orientation + fov, num=self.robot.num_rangers, endpoint=False)
+            ranger_reflections = []
+            for theta, reflection in zip(angles, ranger_reflectionss[0]):
+                laser = matlines.Line2D(xdata=[robot_positions[0][0], robot_positions[0][0] + reflection * np.cos(theta)],
+                                        ydata=[robot_positions[0][1], robot_positions[0][1] + reflection * np.sin(theta)],
+                                        color=laser_color, linestyle='-')
+                ranger_reflections.append(laser)
+            for laser in ranger_reflections:
+                ax.add_artist(laser)
+
             time_annotation = plt.text(-0.5, self.square_width + 0.2, 'Time: {}'.format(0), fontsize=16)
 
             ax.add_artist(robot_)
@@ -216,20 +231,40 @@ class CrazyflieEnv(gym.Env):
             for arrow in arrows: # only one robot in this case, can be further incorporate with multi-agents
                 ax.add_artist(arrow)
             ax.add_artist(time_annotation)
-            plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16)
+
+            plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16, loc='lower right', fancybox=True, framealpha=0.5)
             
             global_step = 0
 
             def update(frame_num):
                 nonlocal global_step
                 nonlocal arrows
+                nonlocal ranger_reflections
                 global_step = frame_num
+
+                # update robot position
                 robot_.center = robot_positions[frame_num]
+
+                # update robot velocity direction
                 for arrow in arrows: # only a robot in this
                     arrow.remove()
-                    arrows = [patches.FancyArrowPatch(*orientation[frame_num], color=arrow_color, arrowstyle=arrow_style)]
-                    for arrow in arrows:
-                        ax.add_artist(arrow)
+                arrows = [patches.FancyArrowPatch(*directions_vector[frame_num], color=arrow_color, arrowstyle=arrow_style)]
+                for arrow in arrows:
+                    ax.add_artist(arrow)
+                
+                # update ranger reflections
+                for laser in ranger_reflections:
+                    laser.remove()
+                ranger_reflections = []
+                for theta, reflection in zip(angles, ranger_reflectionss[frame_num]):
+                    laser = matlines.Line2D(xdata=[robot_positions[frame_num][0], robot_positions[frame_num][0] + reflection * np.cos(theta)],
+                                        ydata=[robot_positions[frame_num][1], robot_positions[frame_num][1] + reflection * np.sin(theta)],
+                                        color=laser_color, linestyle='-')
+                    ranger_reflections.append(laser)
+                for laser in ranger_reflections:
+                    ax.add_artist(laser)
+                
+                # add time annotation
                 time_annotation.set_text('Time: {:.2f}'.format(frame_num * self.time_step))
             
             def on_click(event):

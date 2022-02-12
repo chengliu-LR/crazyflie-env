@@ -6,3 +6,5 @@ envs/__pycache__/
 *.gif
 #macOS
 .DS_Store
+.vscode
+.ipynb*
