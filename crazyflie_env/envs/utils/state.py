@@ -29,3 +29,6 @@ class FullState():
     
     def __len__(self):
         return len(self.state_tuple)
+
+class ObservableState():
+    pass

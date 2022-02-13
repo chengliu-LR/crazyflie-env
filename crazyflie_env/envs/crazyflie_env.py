@@ -27,11 +27,11 @@ class CrazyflieEnv(gym.Env):
         self._set_robot(Robot())
 
         # reward function
-        self.success_reward = 50
-        self.collision_penalty = -25
-        self.goal_distance_penalty_factor = -2
-        self.discomfort_dist = 0.5
-        self.discomfort_penalty_factor = 5
+        self.success_reward = 500
+        self.collision_penalty = -100
+        self.goal_distance_penalty_factor = -0.5
+        self.discomfort_dist = 0.2
+        self.discomfort_penalty_factor = 2
 
         # simulation config
         self.square_width = 3.0 # half width of the square environment
@@ -95,8 +95,8 @@ class CrazyflieEnv(gym.Env):
         if random_position == False:
             # set obstacles with given position, shape, and angles
             pos = [(0, -1), (2, 1), (-1, 2)]
-            wxs = [2, 0.5, 0.5]
-            wys = [0.5, 2, 1.5]
+            wxs = [2, 0.1, 0.1]
+            wys = [0.1, 2, 1.5]
             angles = [0, 0, np.pi * 3/4]
         else:
             # TODO: put randomly generated obstacles to the environment
@@ -119,7 +119,8 @@ class CrazyflieEnv(gym.Env):
         if self.robot is None:
             raise AttributeError('Robot has to be set!')
         
-        self.obstacles = self.generate_obstacles()
+        #self.obstacles = self.generate_obstacles()
+        self.obstacles = []
         self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         if self.random_init:
@@ -146,7 +147,6 @@ class CrazyflieEnv(gym.Env):
         action: ActionXY
         Return: (ob, reward, done, info)
         """
-
         # collision detection
         robot_next_position = self.robot.compute_next_position(action, self.time_step)
         collision, dist_min = self.check_collision(robot_next_position)
@@ -192,8 +192,8 @@ class CrazyflieEnv(gym.Env):
     def render(self, mode='video', output_file=None):
         #plt.rcParams['animation.ffmpeg_path'] = '/usr/local/bin/ffmpeg'
         cmap = plt.cm.get_cmap('hsv', 10)
-        robot_color = 'springgreen'
-        laser_color = 'mediumspringgreen'
+        robot_color = 'silver'
+        laser_color = 'lightskyblue'
         goal_color = 'tomato'
         arrow_color = 'red'
         obstacle_color = 'darkgrey'
@@ -201,9 +201,8 @@ class CrazyflieEnv(gym.Env):
 
         if mode == 'trajectory':
             pass
-
         elif mode == 'video':
-            fig, ax = plt.subplots(figsize=(5, 5), facecolor='white')
+            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=100)
             ax.tick_params(labelsize=16)
             ax.set_xlim(-self.square_width, self.square_width)
             ax.set_ylim(-self.square_width, self.square_width)
@@ -255,6 +254,7 @@ class CrazyflieEnv(gym.Env):
                 ax.add_artist(arrow)
             ax.add_artist(time_annotation)
             plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16, loc='lower right', fancybox=True, framealpha=0.5)
+
 
             def update(frame_num):
                 nonlocal arrows
