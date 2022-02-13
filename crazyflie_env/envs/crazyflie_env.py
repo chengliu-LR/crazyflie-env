@@ -90,6 +90,25 @@ class CrazyflieEnv(gym.Env):
         return collision, dist_min
 
 
+    def generate_obstacles(self, random_position=False, obstacle_num=3, obstacle_shape='Rectangle'):
+        obstacles = []
+        if random_position == False:
+            # set obstacles with given position, shape, and angles
+            pos = [(0, -1), (2, 1), (-1, 2)]
+            wxs = [2, 0.5, 0.5]
+            wys = [0.5, 2, 1.5]
+            angles = [0, 0, np.pi * 3/4]
+        else:
+            # TODO: put randomly generated obstacles to the environment
+            pass
+
+        for i in range(obstacle_num):
+            obstacle = Obstacle((pos[i][0], pos[i][1]), wxs[i], wys[i], angles[i])
+            obstacles.append(obstacle)
+
+        return obstacles
+
+
     def reset(self):
         """
         Set obstacles in env.
@@ -100,8 +119,7 @@ class CrazyflieEnv(gym.Env):
         if self.robot is None:
             raise AttributeError('Robot has to be set!')
         
-        # TODO: put randomly generated obstacles to the environment
-        self.obstacles = [Obstacle((0, 0), 0.5, 0.5), Obstacle((1, 2), 0.5, 0.5, angle=np.pi * 3/4)]
+        self.obstacles = self.generate_obstacles()
         self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         if self.random_init:
@@ -130,11 +148,11 @@ class CrazyflieEnv(gym.Env):
         """
 
         # collision detection
-        next_position = self.robot.compute_next_position(action, self.time_step)
-        collision, dist_min = self.check_collision(next_position)
+        robot_next_position = self.robot.compute_next_position(action, self.time_step)
+        collision, dist_min = self.check_collision(robot_next_position)
 
         # check if reaching the goal
-        goal_distance = np.linalg.norm(next_position - self.robot.get_goal_position())
+        goal_distance = np.linalg.norm(robot_next_position - self.robot.get_goal_position())
         goal_reached = goal_distance < self.robot.radius
 
         reward = self.goal_distance_penalty_factor * goal_distance
@@ -174,17 +192,18 @@ class CrazyflieEnv(gym.Env):
     def render(self, mode='video', output_file=None):
         #plt.rcParams['animation.ffmpeg_path'] = '/usr/local/bin/ffmpeg'
         cmap = plt.cm.get_cmap('hsv', 10)
-        robot_color = 'lime'
-        laser_color = 'aquamarine'
-        goal_color = 'red'
-        arrow_color = 'orange'
+        robot_color = 'springgreen'
+        laser_color = 'mediumspringgreen'
+        goal_color = 'tomato'
+        arrow_color = 'red'
+        obstacle_color = 'darkgrey'
         arrow_style = patches.ArrowStyle("simple", head_length=5, head_width=3)
 
         if mode == 'trajectory':
             pass
 
         elif mode == 'video':
-            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white')
+            fig, ax = plt.subplots(figsize=(5, 5), facecolor='white')
             ax.tick_params(labelsize=16)
             ax.set_xlim(-self.square_width, self.square_width)
             ax.set_ylim(-self.square_width, self.square_width)
@@ -200,29 +219,33 @@ class CrazyflieEnv(gym.Env):
                 directions_vector.append(((state.px, state.py), (state.px + radius * np.cos(theta), state.py + radius * np.sin(theta))))
 
             # set obstacles
-            obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi) for obs in self.obstacles]
+            obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi, color=obstacle_color) for obs in self.obstacles]
             for obstacle_ in obstacles_:
                 ax.add_artist(obstacle_)
             
             # get ranger reflections at each time step
             ranger_reflectionss = [state.ranger_reflections for state in self.states]
+            angles = np.linspace(self.robot.theta_orientation, self.robot.theta_orientation + self.robot.fov, num=self.robot.num_rangers, endpoint=False)
+
+            # plot ranger reflections at time step 0
+            lasers_ = []
+            def plot_ranger_reflections(angles, ranger_reflectionss, frame):
+                for theta, reflection in zip(angles, ranger_reflectionss[frame]):
+                    laser = matlines.Line2D(xdata=[robot_positions[frame][0] + radius*np.cos(theta), robot_positions[frame][0] + reflection*np.cos(theta)],
+                                            ydata=[robot_positions[frame][1] + radius*np.sin(theta), robot_positions[frame][1] + reflection*np.sin(theta)],
+                                            color=laser_color, linestyle='-', linewidth=2)
+                    lasers_.append(laser)
+                for laser in lasers_:
+                    ax.add_artist(laser)
+
+            plot_ranger_reflections(angles=angles, ranger_reflectionss=ranger_reflectionss, frame=0)
 
             # set robot, goal pos, arrows of each robot, ranger reflections and time annotation at timestep 0
-            robot_ = plt.Circle(robot_positions[0], radius, fill=True, color=robot_color)
             goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance],
                                    color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
-            arrows = [patches.FancyArrowPatch(*directions_vector[0], color=arrow_color, arrowstyle=arrow_style)]
 
-            fov = 2*np.pi
-            angles = np.linspace(self.robot.theta_orientation, self.robot.theta_orientation + fov, num=self.robot.num_rangers, endpoint=False)
-            ranger_reflections = []
-            for theta, reflection in zip(angles, ranger_reflectionss[0]):
-                laser = matlines.Line2D(xdata=[robot_positions[0][0], robot_positions[0][0] + reflection * np.cos(theta)],
-                                        ydata=[robot_positions[0][1], robot_positions[0][1] + reflection * np.sin(theta)],
-                                        color=laser_color, linestyle='-')
-                ranger_reflections.append(laser)
-            for laser in ranger_reflections:
-                ax.add_artist(laser)
+            robot_ = plt.Circle(robot_positions[0], radius, fill=True, color=robot_color)
+            arrows = [patches.FancyArrowPatch(*directions_vector[0], color=arrow_color, arrowstyle=arrow_style)]
 
             time_annotation = plt.text(-0.5, self.square_width + 0.2, 'Time: {}'.format(0), fontsize=16)
 
@@ -231,17 +254,18 @@ class CrazyflieEnv(gym.Env):
             for arrow in arrows: # only one robot in this case, can be further incorporate with multi-agents
                 ax.add_artist(arrow)
             ax.add_artist(time_annotation)
-
             plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16, loc='lower right', fancybox=True, framealpha=0.5)
-            
-            global_step = 0
 
             def update(frame_num):
-                nonlocal global_step
                 nonlocal arrows
-                nonlocal ranger_reflections
-                global_step = frame_num
-
+                nonlocal lasers_
+                
+                # replot ranger reflections
+                for laser in lasers_:
+                    laser.remove()
+                lasers_ = []
+                plot_ranger_reflections(angles=angles, ranger_reflectionss=ranger_reflectionss, frame=frame_num)
+                
                 # update robot position
                 robot_.center = robot_positions[frame_num]
 
@@ -252,21 +276,10 @@ class CrazyflieEnv(gym.Env):
                 for arrow in arrows:
                     ax.add_artist(arrow)
                 
-                # update ranger reflections
-                for laser in ranger_reflections:
-                    laser.remove()
-                ranger_reflections = []
-                for theta, reflection in zip(angles, ranger_reflectionss[frame_num]):
-                    laser = matlines.Line2D(xdata=[robot_positions[frame_num][0], robot_positions[frame_num][0] + reflection * np.cos(theta)],
-                                        ydata=[robot_positions[frame_num][1], robot_positions[frame_num][1] + reflection * np.sin(theta)],
-                                        color=laser_color, linestyle='-')
-                    ranger_reflections.append(laser)
-                for laser in ranger_reflections:
-                    ax.add_artist(laser)
-                
                 # add time annotation
                 time_annotation.set_text('Time: {:.2f}'.format(frame_num * self.time_step))
-            
+
+
             def on_click(event):
                 anim.running ^= True
                 if anim.running:
