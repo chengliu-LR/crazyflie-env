@@ -27,15 +27,15 @@ class CrazyflieEnv(gym.Env):
         self._set_robot(Robot())
 
         # reward function
-        self.success_reward = 500
-        self.collision_penalty = -100
-        self.goal_distance_penalty_factor = -0.5
+        self.success_reward = 50
+        self.collision_penalty = -25
+        self.goal_dist_reward_factor = -1
         self.discomfort_dist = 0.2
         self.discomfort_penalty_factor = 2
 
         # simulation config
         self.square_width = 3.0 # half width of the square environment
-        self.goal_distance = 2.0 # initial distance to goal pos
+        self.goal_height = 2.0 # initial distance to goal pos
         self.UP_RIGHT = (self.square_width, self.square_width)
         self.BOTTOM_RIGHT = (self.square_width, -self.square_width)
         self.BOTTOM_LEFT = (-self.square_width, -self.square_width)
@@ -45,13 +45,12 @@ class CrazyflieEnv(gym.Env):
         self.right_wall = (self.UP_RIGHT[0], self.UP_RIGHT[1], self.BOTTOM_RIGHT[0], self.BOTTOM_RIGHT[1])
         self.back_wall = (self.BOTTOM_RIGHT[0], self.BOTTOM_RIGHT[1], self.BOTTOM_LEFT[0], self.BOTTOM_LEFT[1])
         self.left_wall = (self.BOTTOM_LEFT[0], self.BOTTOM_LEFT[1], self.UP_LEFT[0], self.UP_LEFT[1])
-
-        # walls and obstacles to avoid
         self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall] # ((x1, y1), (x1', y1'))
-        self.obstacles = []
+
+        self.obstacles = self.generate_obstacles(obstacle_num=3)
         self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
-        # visualization
+        # visualization, store full state of the robot
         self.states = None
 
 
@@ -112,16 +111,12 @@ class CrazyflieEnv(gym.Env):
     def reset(self):
         """
         Set obstacles in env.
-        Set robot at (0, -goal_distance) with zero initial velocity.
+        Set robot at (0, -goal_height) with zero initial velocity.
         Return: FullState
         """
         self.global_time = 0
         if self.robot is None:
             raise AttributeError('Robot has to be set!')
-        
-        #self.obstacles = self.generate_obstacles()
-        self.obstacles = []
-        self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         if self.random_init:
             # set robot position randomly, if collide, reinitialize
@@ -132,12 +127,12 @@ class CrazyflieEnv(gym.Env):
                 initial_collision, _ = self.check_collision(initial_position)
             assert initial_collision is False
         else:
-            initial_position = np.array([0, -self.goal_distance])
+            initial_position = np.array([0, -self.goal_height])
         
         # TODO: randomly initialize goal position
-        self.robot.set_state(initial_position[0], initial_position[1], 0, self.goal_distance, 0, 0, self.obstacle_segments)
+        self.robot.set_state(initial_position[0], initial_position[1], 0, self.goal_height, 0, 0, self.obstacle_segments)
         self.states = list()
-        ob = self.robot.get_full_state()
+        ob = self.robot.get_observable_state()
 
         return ob
     
@@ -155,7 +150,10 @@ class CrazyflieEnv(gym.Env):
         goal_distance = np.linalg.norm(robot_next_position - self.robot.get_goal_position())
         goal_reached = goal_distance < self.robot.radius
 
-        reward = self.goal_distance_penalty_factor * goal_distance
+        # reward the robot if its achieving to the goal
+        robot_cur_goal_dist = self.robot.get_goal_distance()
+        delta_goal_distance = goal_distance - robot_cur_goal_dist
+        reward = self.goal_dist_reward_factor * delta_goal_distance if delta_goal_distance < 0 else 0.0
 
         # TODO: reward function for collision provided with rangers
         if self.global_time > self.time_limit:
@@ -178,13 +176,11 @@ class CrazyflieEnv(gym.Env):
             info = "Nothing"
         
         if update:
-            # store for visualization
+            # update agent states
+            ob = self.robot.step(action, self.obstacle_segments)
+            # get full state for plotting
             self.states.append(self.robot.get_full_state())
-            # update agents
-            self.robot.step(action, self.obstacle_segments)
             self.global_time += self.time_step
-
-            ob = self.robot.get_full_state()
         
         return ob, reward, done, info
 
@@ -202,7 +198,7 @@ class CrazyflieEnv(gym.Env):
         if mode == 'trajectory':
             pass
         elif mode == 'video':
-            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=100)
+            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=80)
             ax.tick_params(labelsize=16)
             ax.set_xlim(-self.square_width, self.square_width)
             ax.set_ylim(-self.square_width, self.square_width)
@@ -240,7 +236,7 @@ class CrazyflieEnv(gym.Env):
             plot_ranger_reflections(angles=angles, ranger_reflectionss=ranger_reflectionss, frame=0)
 
             # set robot, goal pos, arrows of each robot, ranger reflections and time annotation at timestep 0
-            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_distance],
+            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_height],
                                    color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
 
             robot_ = plt.Circle(robot_positions[0], radius, fill=True, color=robot_color)

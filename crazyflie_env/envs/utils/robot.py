@@ -4,7 +4,7 @@ from gym.utils import seeding
 import gym
 import numpy as np
 from crazyflie_env.envs.utils.action import ActionXY
-from crazyflie_env.envs.utils.state import FullState
+from crazyflie_env.envs.utils.state import FullState, ObservableState
 from crazyflie_env.envs.utils.util import get_ranger_reflection
 
 class Robot():
@@ -54,13 +54,9 @@ class Robot():
         return FullState(self.px, self.py, self.vx, self.vy, self.radius, self.gx, self.gy, self.ranger_reflections)
 
 
-    # def get_next_full_state(self, action):
-    #     self.validate_action(action)
-    #     next_px, next_py = self.compute_next_position(action, self.time_step)
-    #     next_vx = action.vx
-    #     next_vy = action.vy
-
-    #     return FullState(next_px, next_px, next_vx, next_vy, self.radius, self.gx, self.gy, self.ranger_reflections)
+    def get_observable_state(self):
+        goal_distance = self.get_goal_distance()
+        return ObservableState(goal_distance, self.vx, self.vy, self.ranger_reflections)
 
 
     def get_position(self):
@@ -105,8 +101,13 @@ class Robot():
         self.vx = action.vx
         self.vy = action.vy
         self.ranger_reflections = self.get_ranger_reflections(segments)
-        return self.get_full_state()
+        
+        return self.get_observable_state()
+    
 
+    def get_goal_distance(self):
+        return np.linalg.norm(self.get_position() - self.get_goal_position())
+    
 
     def reached_destination(self):
-        return np.linalg.norm(self.get_position() - self.get_goal_position()) < self.radius
+        return self.get_goal_distance() < self.radius
