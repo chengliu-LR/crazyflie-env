@@ -1,5 +1,5 @@
 """
-Full state to describe state of your robot.
+State to describe state of your robot.
 """
 class FullState():
     def __init__(self, px, py, vx, vy, radius, gx, gy, ranger_reflections):
@@ -26,9 +26,27 @@ class FullState():
 
     def __str__(self):
         return ' '.join([str(x) for x in self.state_tuple])
-    
+
     def __len__(self):
         return len(self.state_tuple)
 
+
 class ObservableState():
-    pass
+    def __init__(self, goal_distance, vx, vy, ranger_reflections):
+        self.goal_distance = goal_distance
+        self.vx = vx
+        self.vy = vy
+        self.ranger_reflections = ranger_reflections
+
+        self.state_tuple = (self.goal_distance, self.vx, self.vy,
+                            self.ranger_reflections[0], self.ranger_reflections[1],
+                            self.ranger_reflections[2], self.ranger_reflections[3])
+    
+    def __add__(self, other):
+        return other + self.state_tuple
+
+    def __str__(self):
+        return ' '.join([str(x) for x in self.state_tuple])
+
+    def __len__(self):
+        return len(self.state_tuple)
