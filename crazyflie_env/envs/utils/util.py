@@ -83,12 +83,12 @@ def get_ranger_reflection(segments, fov=2*np.pi, n_reflections=4, max_dist=3, xy
     xy_robot = xytheta_robot[:2] # robot position
     theta_robot = xytheta_robot[2] # robot angle in rad
 
-    angles = np.linspace(theta_robot, theta_robot + fov, num=n_reflections, endpoint=False)
+    ranger_angles = np.linspace(theta_robot, theta_robot + fov, num=n_reflections, endpoint=False)
     ranger_reflections = max_dist * np.ones(n_reflections) # initialize each ranger reflection to its max possible distance
 
     for segment in segments:
         xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:]) # start and end points of each segment
-        for i, theta in enumerate(angles):
+        for i, theta in enumerate(ranger_angles):
             max_xy_ranger = xy_robot + np.array([max_dist * np.cos(theta), max_dist * np.sin(theta)])
             intersection = get_intersection(xy_start, xy_end, xy_robot, max_xy_ranger)
             if intersection is not None:
