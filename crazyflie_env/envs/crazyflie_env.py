@@ -9,7 +9,7 @@ from matplotlib import animation
 from matplotlib import patches
 from crazyflie_env.envs.utils.util import point_to_segment_dist
 from crazyflie_env.envs.utils.state import FullState
-from crazyflie_env.envs.utils.action import ActionXY
+from crazyflie_env.envs.utils.action import ActionRotation
 from crazyflie_env.envs.utils.robot import Robot
 from crazyflie_env.envs.utils.obstacle import Obstacle
 #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
@@ -129,7 +129,6 @@ class CrazyflieEnv(gym.Env):
         else:
             initial_position = np.array([0, -self.goal_height])
         
-        # TODO: randomly initialize goal position
         self.robot.set_state(initial_position[0], initial_position[1], 0, self.goal_height, 0, 0, self.obstacle_segments)
         self.states = list()
         ob = self.robot.get_observable_state()
@@ -139,15 +138,16 @@ class CrazyflieEnv(gym.Env):
 
     def step(self, action, update=True):
         """Compute action for robot, detect collision, update environment.
-        action: ActionXY
+        action: ActionRotation
         Return: (ob, reward, done, info)
         """
         # collision detection
-        robot_next_position = self.robot.compute_next_position(action, self.time_step)
-        collision, dist_min = self.check_collision(robot_next_position)
+        next_orientation = self.robot.compute_next_orientation(action, self.time_step)
+        next_position = self.robot.compute_next_position(next_orientation, action, self.time_step)
+        collision, dist_min = self.check_collision(next_position)
 
         # check if reaching the goal
-        goal_distance = np.linalg.norm(robot_next_position - self.robot.get_goal_position())
+        goal_distance = np.linalg.norm(next_position - self.robot.get_goal_position())
         goal_reached = goal_distance < self.robot.radius
 
         # reward the robot if its achieving to the goal
@@ -155,7 +155,6 @@ class CrazyflieEnv(gym.Env):
         delta_goal_distance = goal_distance - robot_cur_goal_dist
         reward = self.goal_dist_reward_factor * delta_goal_distance if delta_goal_distance < 0 else 0.0
 
-        # TODO: reward function for collision provided with rangers
         if self.global_time > self.time_limit:
             done = True
             info = "Timeout"
@@ -198,7 +197,7 @@ class CrazyflieEnv(gym.Env):
         if mode == 'trajectory':
             pass
         elif mode == 'video':
-            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=80)
+            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=250)
             ax.tick_params(labelsize=16)
             ax.set_xlim(-self.square_width, self.square_width)
             ax.set_ylim(-self.square_width, self.square_width)
@@ -209,23 +208,29 @@ class CrazyflieEnv(gym.Env):
             robot_positions = [state.position for state in self.states]
             radius = self.robot.radius
             directions_vector = []
+
             for state in self.states:
-                theta = np.arctan2(state.vy, state.vx)
-                directions_vector.append(((state.px, state.py), (state.px + radius * np.cos(theta), state.py + radius * np.sin(theta))))
+                theta = state.orientation
+                offset_x = radius * np.cos(theta)
+                offset_y = radius * np.sin(theta)
+                directions_vector.append(((state.px - offset_x, state.py - offset_y), (state.px + offset_x, state.py + offset_y)))
 
             # set obstacles
             obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi, color=obstacle_color) for obs in self.obstacles]
             for obstacle_ in obstacles_:
                 ax.add_artist(obstacle_)
             
-            # get ranger reflections at each time step
+            # get ranger reflections and robot orientation at each time step
             ranger_reflectionss = [state.ranger_reflections for state in self.states]
-            angles = np.linspace(self.robot.theta_orientation, self.robot.theta_orientation + self.robot.fov, num=self.robot.num_rangers, endpoint=False)
+            angless = []
+            for state in self.states:
+                angles = np.linspace(state.orientation, state.orientation + self.robot.fov, num=self.robot.num_rangers, endpoint=False)
+                angless.append(angles)
 
             # plot ranger reflections at time step 0
             lasers_ = []
-            def plot_ranger_reflections(angles, ranger_reflectionss, frame):
-                for theta, reflection in zip(angles, ranger_reflectionss[frame]):
+            def plot_ranger_reflections(angless, ranger_reflectionss, frame):
+                for theta, reflection in zip(angless[frame], ranger_reflectionss[frame]):
                     laser = matlines.Line2D(xdata=[robot_positions[frame][0] + radius*np.cos(theta), robot_positions[frame][0] + reflection*np.cos(theta)],
                                             ydata=[robot_positions[frame][1] + radius*np.sin(theta), robot_positions[frame][1] + reflection*np.sin(theta)],
                                             color=laser_color, linestyle='-', linewidth=2)
@@ -233,7 +238,7 @@ class CrazyflieEnv(gym.Env):
                 for laser in lasers_:
                     ax.add_artist(laser)
 
-            plot_ranger_reflections(angles=angles, ranger_reflectionss=ranger_reflectionss, frame=0)
+            plot_ranger_reflections(angless=angless, ranger_reflectionss=ranger_reflectionss, frame=0)
 
             # set robot, goal pos, arrows of each robot, ranger reflections and time annotation at timestep 0
             goal = matlines.Line2D(xdata=[0], ydata=[self.goal_height],
@@ -260,7 +265,7 @@ class CrazyflieEnv(gym.Env):
                 for laser in lasers_:
                     laser.remove()
                 lasers_ = []
-                plot_ranger_reflections(angles=angles, ranger_reflectionss=ranger_reflectionss, frame=frame_num)
+                plot_ranger_reflections(angless=angless, ranger_reflectionss=ranger_reflectionss, frame=frame_num)
                 
                 # update robot position
                 robot_.center = robot_positions[frame_num]

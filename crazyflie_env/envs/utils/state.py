@@ -2,22 +2,21 @@
 State to describe state of your robot.
 """
 class FullState():
-    def __init__(self, px, py, vx, vy, radius, gx, gy, ranger_reflections):
+    def __init__(self, px, py, vf, radius, gx, gy, orientation, ranger_reflections):
         self.px = px
         self.py = py
-        self.vx = vx
-        self.vy = vy
+        self.vf = vf
         self.radius = radius
         self.gx = gx
         self.gy = gy
+        self.orientation = orientation
 
         self.position = (self.px, self.py)
         self.goal_position = (self.gx, self.gy)
-        self.velocity = (self.vx, self.vy)
 
         self.ranger_reflections = ranger_reflections
 
-        self.state_tuple = (self.px, self.py, self.vx, self.vy, self.radius, self.gx, self.gy,
+        self.state_tuple = (self.px, self.py, self.vf, self.radius, self.gx, self.gy, self.orientation,
                             self.ranger_reflections[0], self.ranger_reflections[1],
                             self.ranger_reflections[2], self.ranger_reflections[3])
 
@@ -32,13 +31,12 @@ class FullState():
 
 
 class ObservableState():
-    def __init__(self, goal_distance, vx, vy, ranger_reflections):
+    def __init__(self, goal_distance, orientation, ranger_reflections):
         self.goal_distance = goal_distance
-        self.vx = vx
-        self.vy = vy
+        self.orientation = orientation
         self.ranger_reflections = ranger_reflections
 
-        self.state_tuple = (self.goal_distance, self.vx, self.vy,
+        self.state_tuple = (self.goal_distance, self.orientation,
                             self.ranger_reflections[0], self.ranger_reflections[1],
                             self.ranger_reflections[2], self.ranger_reflections[3])
     
