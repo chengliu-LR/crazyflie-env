@@ -8,13 +8,14 @@ from crazyflie_env.envs.utils.state import FullState, ObservableState
 from crazyflie_env.envs.utils.util import get_ranger_reflection
 
 class Robot():
-    def __init__(self, config=None):
+    def __init__(self, partial_observation=True):
         self.radius = 0.1
         self.v_pref = 1.0 # max possible velocity
         self.time_step = None
         self.fov = 2 * np.pi
         self.num_rangers = 4
         self.max_ranger_dist = 3.0
+        self.partial_observation = partial_observation
 
         self.px = None
         self.py = None
@@ -56,9 +57,14 @@ class Robot():
 
 
     def get_observable_state(self):
-        # TODO1: add orientation to observation
-        # TODO2: historical ranger inputs
         return ObservableState(self.get_goal_distance(), self.orientation, self.ranger_reflections)
+
+
+    def observe(self):
+        if self.partial_observation:
+            return self.get_observable_state()
+        else:
+            return self.get_full_state()
 
 
     def get_position(self):
@@ -67,6 +73,17 @@ class Robot():
 
     def get_goal_position(self):
         return np.array([self.gx, self.gy])
+
+
+    def compute_next_xy(self, action, dt):
+        """
+        compute next position according to forward velocity and orientation
+        """
+        assert isinstance(action, ActionXY)
+        px = self.px + action.vx * dt
+        py = self.py + action.vy * dt
+
+        return np.array([px, py]) # implicitly return a tuple instead of two values
 
 
     def compute_next_orientation(self, action, dt):
@@ -78,6 +95,7 @@ class Robot():
         orientation = (self.orientation + action.rot * dt) % (2 * np.pi)
 
         return orientation
+
 
     def compute_next_position(self, orientation, action, dt):
         """
@@ -96,21 +114,32 @@ class Robot():
         assert isinstance(action, ActionRotation)
 
 
-    def step(self, action, segments):
+    def step(self, action, segments, next_orientation, next_position):
         """
         update orientation, position, and ranger reflection to next state.
         note that orientation and position won't be updated at same step.
         """
         self.validate_action(action)
-        next_orientation = self.compute_next_orientation(action, self.time_step)
-        next_position = self.compute_next_position(next_orientation, action, self.time_step)
         self.px, self.py = next_position[0], next_position[1]
         self.vf = action.vf
         self.orientation = next_orientation
         self.ranger_reflections = self.get_ranger_reflections(segments)
         
-        return self.get_observable_state()
+        #return self.get_observable_state()
+        return self.observe()
     
+
+    def step_xy(self, action, segments, next_position):
+        """
+        update orientation, position, and ranger reflection to next state.
+        note that orientation and position won't be updated at same step.
+        """
+        self.px, self.py = next_position[0], next_position[1]
+        self.ranger_reflections = self.get_ranger_reflections(segments)
+        # self.vf makes no sense in this action space
+        #return self.get_observable_state()
+        return self.observe()
+
 
     def get_goal_distance(self):
         return np.linalg.norm(self.get_position() - self.get_goal_position())

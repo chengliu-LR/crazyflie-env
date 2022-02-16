@@ -1,6 +1,8 @@
 """
 State to describe state of your robot.
 """
+import numpy as np
+
 class FullState():
     def __init__(self, px, py, vf, radius, gx, gy, orientation, ranger_reflections):
         self.px = px
@@ -11,8 +13,8 @@ class FullState():
         self.gy = gy
         self.orientation = orientation
 
-        self.position = (self.px, self.py)
-        self.goal_position = (self.gx, self.gy)
+        self.position = np.array([self.px, self.py])
+        self.goal_position = np.array([self.gx, self.gy])
 
         self.ranger_reflections = ranger_reflections
 

@@ -21,17 +21,30 @@ class CrazyflieEnv(gym.Env):
         """Agent is controlled by a known and learnable policy.
         """
         self.time_limit = 25 # in seconds, not steps
-        self.time_step = 0.05 # in seconds
+        self.time_step = 0.1 # in seconds
         self.global_time = 0 # in seconds
         self.random_init = True # randomly initialize robot position
-        self._set_robot(Robot())
+        self.robot_po = False # partial observability of the robot
+        self._set_robot(Robot(self.robot_po))
+
+        # # reward function
+        # self.success_reward = 5.0
+        # self.collision_penalty = -5.0
+        # self.goal_dist_reward_factor = 0.01
+        # self.discomfort_dist = 0.2
+        # self.discomfort_penalty_factor = -0.05
+        # self.rotation_penalty_factor = -0.05
 
         # reward function
-        self.success_reward = 50
-        self.collision_penalty = -25
-        self.goal_dist_reward_factor = -1
+        self.success_reward = 1000.0
+        self.collision_penalty = -500.0
+        self.goal_dist_penalty_factor = -1.0
         self.discomfort_dist = 0.2
-        self.discomfort_penalty_factor = 2
+        self.discomfort_penalty_factor = -1.0
+        self.rotation_penalty_factor = -0.1
+
+        # goal reaching radius
+        self.goal_reaching_radius = 5 * self.robot.radius
 
         # simulation config
         self.square_width = 3.0 # half width of the square environment
@@ -47,7 +60,7 @@ class CrazyflieEnv(gym.Env):
         self.left_wall = (self.BOTTOM_LEFT[0], self.BOTTOM_LEFT[1], self.UP_LEFT[0], self.UP_LEFT[1])
         self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall] # ((x1, y1), (x1', y1'))
 
-        self.obstacles = self.generate_obstacles(obstacle_num=3)
+        self.obstacles = self.generate_obstacles(obstacle_num=0)
         self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         # visualization, store full state of the robot
@@ -112,26 +125,28 @@ class CrazyflieEnv(gym.Env):
         """
         Set obstacles in env.
         Set robot at (0, -goal_height) with zero initial velocity.
-        Return: FullState
+        Return: FullState or ObservableState
         """
         self.global_time = 0
         if self.robot is None:
             raise AttributeError('Robot has to be set!')
 
         if self.random_init:
-            # set robot position randomly, if collide, reinitialize
+            # set robot position randomly, if collide, reinitialize; randomly initialize orientation too
             # TODO: consider initialize inside an obstacle
             initial_collision = True
             while initial_collision:
                 initial_position = np.random.uniform(-self.square_width, self.square_width, size=2)
                 initial_collision, _ = self.check_collision(initial_position)
             assert initial_collision is False
+            initial_orientation = np.random.uniform(0.0, 2 * np.pi)
         else:
             initial_position = np.array([0, -self.goal_height])
+            initial_orientation = 0.0
         
         self.robot.set_state(initial_position[0], initial_position[1], 0, self.goal_height, 0, 0, self.obstacle_segments)
         self.states = list()
-        ob = self.robot.get_observable_state()
+        ob = self.robot.observe()
 
         return ob
     
@@ -142,18 +157,25 @@ class CrazyflieEnv(gym.Env):
         Return: (ob, reward, done, info)
         """
         # collision detection
-        next_orientation = self.robot.compute_next_orientation(action, self.time_step)
-        next_position = self.robot.compute_next_position(next_orientation, action, self.time_step)
+        if isinstance(action, ActionRotation):
+            next_orientation = self.robot.compute_next_orientation(action, self.time_step)
+            next_position = self.robot.compute_next_position(next_orientation, action, self.time_step)
+        else:
+            next_orientation = self.robot.orientation
+            next_position = self.robot.compute_next_xy(action, self.time_step)
         collision, dist_min = self.check_collision(next_position)
 
         # check if reaching the goal
-        goal_distance = np.linalg.norm(next_position - self.robot.get_goal_position())
-        goal_reached = goal_distance < self.robot.radius
+        next_goal_dist = np.linalg.norm(next_position - self.robot.get_goal_position())
+        goal_reached = next_goal_dist < self.goal_reaching_radius
 
         # reward the robot if its achieving to the goal
-        robot_cur_goal_dist = self.robot.get_goal_distance()
-        delta_goal_distance = goal_distance - robot_cur_goal_dist
-        reward = self.goal_dist_reward_factor * delta_goal_distance if delta_goal_distance < 0 else 0.0
+        #robot_cur_goal_dist = self.robot.get_goal_distance()
+        #reward = self.goal_dist_reward_factor if (next_goal_dist - robot_cur_goal_dist) < 0.0 else 0.0
+        reward = self.goal_dist_penalty_factor * next_goal_dist
+        
+        # penalize angular movements for a smooth trajectory
+        reward += self.rotation_penalty_factor * np.abs(next_orientation - self.robot.orientation)
 
         if self.global_time > self.time_limit:
             done = True
@@ -167,7 +189,7 @@ class CrazyflieEnv(gym.Env):
             done = True
             info = "Goal Reached"
         elif dist_min < self.discomfort_dist:
-            reward += (dist_min - self.discomfort_dist) * self.discomfort_penalty_factor
+            reward += (self.discomfort_dist - dist_min) * self.discomfort_penalty_factor
             done = False
             info = "Danger"
         else:
@@ -176,7 +198,10 @@ class CrazyflieEnv(gym.Env):
         
         if update:
             # update agent states
-            ob = self.robot.step(action, self.obstacle_segments)
+            if isinstance(action, ActionRotation):
+                ob = self.robot.step(action, self.obstacle_segments, next_orientation, next_position)
+            else:
+                ob = self.robot.step_xy(action, self.obstacle_segments, next_position)
             # get full state for plotting
             self.states.append(self.robot.get_full_state())
             self.global_time += self.time_step
