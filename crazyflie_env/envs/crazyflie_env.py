@@ -36,11 +36,11 @@ class CrazyflieEnv(gym.Env):
         # self.rotation_penalty_factor = -0.05
 
         # reward function
-        self.success_reward = 1000.0
-        self.collision_penalty = -500.0
-        self.goal_dist_penalty_factor = -1.0
-        self.discomfort_dist = 0.2
-        self.discomfort_penalty_factor = -1.0
+        self.success_reward = 50.0
+        self.collision_penalty = -25.0
+        self.goal_dist_penalty_factor = -2
+        self.discomfort_dist = 0.5
+        self.discomfort_penalty_factor = -5.0
         self.rotation_penalty_factor = -0.1
 
         # goal reaching radius
