@@ -21,7 +21,7 @@ class CrazyflieEnv(gym.Env):
         """Agent is controlled by a known and learnable policy.
         """
         self.time_limit = 25 # in seconds, not steps
-        self.time_step = 0.1 # in seconds
+        self.time_step = 0.05 # in seconds
         self.global_time = 0 # in seconds
         self.random_init = True # randomly initialize robot position
         self.robot_po = False # partial observability of the robot
@@ -41,7 +41,7 @@ class CrazyflieEnv(gym.Env):
         self.goal_dist_penalty_factor = -2
         self.discomfort_dist = 0.5
         self.discomfort_penalty_factor = -5.0
-        self.rotation_penalty_factor = -0.1
+        self.rotation_penalty_factor = -0.0
 
         # goal reaching radius
         self.goal_reaching_radius = 5 * self.robot.radius
