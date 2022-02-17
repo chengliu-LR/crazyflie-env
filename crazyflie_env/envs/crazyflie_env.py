@@ -39,12 +39,12 @@ class CrazyflieEnv(gym.Env):
         self.success_reward = 50.0
         self.collision_penalty = -25.0
         self.goal_dist_reward_factor = 0.5
-        self.discomfort_dist = 0.5
+        self.discomfort_dist = 0.2
         self.discomfort_penalty_factor = -5.0
         self.rotation_penalty_factor = -0.0
 
         # goal reaching radius
-        self.goal_reaching_radius = 5 * self.robot.radius
+        self.goal_reaching_radius = 1.0 * self.robot.radius
 
         # simulation config
         self.square_width = 3.0 # half width of the square environment
