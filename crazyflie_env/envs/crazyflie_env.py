@@ -38,7 +38,7 @@ class CrazyflieEnv(gym.Env):
         # reward function
         self.success_reward = 50.0
         self.collision_penalty = -25.0
-        self.goal_dist_penalty_factor = -2
+        self.goal_dist_reward_factor = 0.5
         self.discomfort_dist = 0.5
         self.discomfort_penalty_factor = -5.0
         self.rotation_penalty_factor = -0.0
@@ -60,7 +60,7 @@ class CrazyflieEnv(gym.Env):
         self.left_wall = (self.BOTTOM_LEFT[0], self.BOTTOM_LEFT[1], self.UP_LEFT[0], self.UP_LEFT[1])
         self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall] # ((x1, y1), (x1', y1'))
 
-        self.obstacles = self.generate_obstacles(obstacle_num=0)
+        self.obstacles = self.generate_obstacles(obstacle_num=3)
         self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         # visualization, store full state of the robot
@@ -170,9 +170,9 @@ class CrazyflieEnv(gym.Env):
         goal_reached = next_goal_dist < self.goal_reaching_radius
 
         # reward the robot if its achieving to the goal
-        #robot_cur_goal_dist = self.robot.get_goal_distance()
-        #reward = self.goal_dist_reward_factor if (next_goal_dist - robot_cur_goal_dist) < 0.0 else 0.0
-        reward = self.goal_dist_penalty_factor * next_goal_dist
+        robot_cur_goal_dist = self.robot.get_goal_distance()
+        reward = self.goal_dist_reward_factor if (next_goal_dist - robot_cur_goal_dist) < 0.0 else -self.goal_dist_reward_factor
+        #reward = self.goal_dist_penalty_factor * next_goal_dist
         
         # penalize angular movements for a smooth trajectory
         reward += self.rotation_penalty_factor * np.abs(next_orientation - self.robot.orientation)
