@@ -24,7 +24,7 @@ class CrazyflieEnv(gym.Env):
         self.time_step = 0.05 # in seconds
         self.global_time = 0 # in seconds
         self.random_init = True # randomly initialize robot position
-        self.robot_po = False # partial observability of the robot
+        self.robot_po = True # partial observability of the robot
         self._set_robot(Robot(self.robot_po))
 
         # # reward function
@@ -209,18 +209,65 @@ class CrazyflieEnv(gym.Env):
         return ob, reward, done, info
 
 
-    def render(self, mode='video', output_file=None):
+    def render(self, mode='video', output_file=None, density=None):
         #plt.rcParams['animation.ffmpeg_path'] = '/usr/local/bin/ffmpeg'
         cmap = plt.cm.get_cmap('hsv', 10)
-        robot_color = 'silver'
+        robot_color = 'aquamarine'
         laser_color = 'lightskyblue'
         goal_color = 'tomato'
         arrow_color = 'red'
-        obstacle_color = 'darkgrey'
+        obstacle_color = 'dodgerblue'
         arrow_style = patches.ArrowStyle("simple", head_length=5, head_width=3)
 
+        # for text plot around robot
+        x_offset = 0.11
+        y_offset = 0.11
+
         if mode == 'trajectory':
-            pass
+            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white')
+            ax.tick_params(labelsize=16)
+            ax.set_xlim(-self.square_width, self.square_width)
+            ax.set_ylim(-self.square_width, self.square_width)
+            ax.set_xlabel('x(m)', fontsize=16)
+            ax.set_ylabel('y(m)', fontsize=16)
+
+            # set goal point
+            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_height],
+                                   color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
+
+            # set obstacles
+            obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi, color=obstacle_color) for obs in self.obstacles]
+            for obstacle_ in obstacles_:
+                ax.add_artist(obstacle_)
+
+            robot_positions = [state.position for state in self.states]
+
+            for k in range(len(self.states)):
+                # plot robot positions
+                if k % density == 0 or k == len(self.states) - 1:
+                    robot_ = plt.Circle(robot_positions[k], self.robot.radius, fill=True, color=robot_color)
+                    ax.add_artist(robot_)
+                
+                # plot time in seconds
+                global_time = k * self.time_step
+                if global_time % 2 == 0 or k == len(self.states) - 1:
+                    times = plt.text(robot_.center[0] - x_offset, robot_.center[1] - y_offset, '{:.1f}'.format(global_time))
+                    ax.add_artist(times)
+                
+                # connecting dots
+                if k != 0:
+                    nav_directions = plt.Line2D((self.states[k - 1].px, self.states[k].px),
+                                                (self.states[k - 1].py, self.states[k].py),
+                                                color=robot_color, ls='solid')
+                    ax.add_artist(nav_directions)
+            plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16, loc='lower right', fancybox=True, framealpha=0.5)
+
+            if output_file is not None:
+                fig.savefig(output_file + '.png')
+            else:
+                plt.show()
+            
+
         elif mode == 'video':
             fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=250)
             ax.tick_params(labelsize=16)
@@ -236,6 +283,7 @@ class CrazyflieEnv(gym.Env):
 
             for state in self.states:
                 theta = state.orientation
+                #theta = np.arctan2(state.vy, state.vx)
                 offset_x = radius * np.cos(theta)
                 offset_y = radius * np.sin(theta)
                 directions_vector.append(((state.px - offset_x, state.py - offset_y), (state.px + offset_x, state.py + offset_y)))
@@ -252,17 +300,17 @@ class CrazyflieEnv(gym.Env):
                 angles = np.linspace(state.orientation, state.orientation + self.robot.fov, num=self.robot.num_rangers, endpoint=False)
                 angless.append(angles)
 
-            # plot ranger reflections at time step 0
             lasers_ = []
             def plot_ranger_reflections(angless, ranger_reflectionss, frame):
-                for theta, reflection in zip(angless[frame], ranger_reflectionss[frame]):
-                    laser = matlines.Line2D(xdata=[robot_positions[frame][0] + radius*np.cos(theta), robot_positions[frame][0] + reflection*np.cos(theta)],
-                                            ydata=[robot_positions[frame][1] + radius*np.sin(theta), robot_positions[frame][1] + reflection*np.sin(theta)],
+                for angle, reflection in zip(angless[frame], ranger_reflectionss[frame]):
+                    laser = matlines.Line2D(xdata=[robot_positions[frame][0] + radius*np.cos(angle), robot_positions[frame][0] + reflection*np.cos(angle)],
+                                            ydata=[robot_positions[frame][1] + radius*np.sin(angle), robot_positions[frame][1] + reflection*np.sin(angle)],
                                             color=laser_color, linestyle='-', linewidth=2)
                     lasers_.append(laser)
                 for laser in lasers_:
                     ax.add_artist(laser)
 
+            # plot ranger reflections at time step 0
             plot_ranger_reflections(angless=angless, ranger_reflectionss=ranger_reflectionss, frame=0)
 
             # set robot, goal pos, arrows of each robot, ranger reflections and time annotation at timestep 0
@@ -320,6 +368,6 @@ class CrazyflieEnv(gym.Env):
             if output_file is not None:
                 ffmpeg_writer = animation.writers['ffmpeg']
                 writer = ffmpeg_writer(fps=8, metadata=dict(artist='Me', bitrate=1800))
-                anim.save(output_file, writer=writer)
+                anim.save(output_file + '.gif', writer=writer)
             else:
                 plt.show()
