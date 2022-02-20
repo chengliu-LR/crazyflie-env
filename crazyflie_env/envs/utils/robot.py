@@ -1,15 +1,15 @@
 import math
 import logging
-from gym.utils import seeding
-import gym
 import numpy as np
+import gym
+from gym.utils import seeding
 from crazyflie_env.envs.utils.action import ActionXY, ActionRotation
 from crazyflie_env.envs.utils.state import FullState, ObservableState
 from crazyflie_env.envs.utils.util import get_ranger_reflection
 
 class Robot():
     def __init__(self, partial_observation=True):
-        self.radius = 0.1
+        self.radius = 0.05
         self.v_pref = 1.0 # max possible velocity
         self.time_step = None
         self.fov = 2 * np.pi
@@ -111,7 +111,7 @@ class Robot():
 
 
     def validate_action(self, action):
-        assert isinstance(action, ActionRotation)
+        assert isinstance(action, ActionRotation) or isinstance(action, ActionXY)
 
 
     def step(self, action, segments, next_orientation, next_position):
@@ -136,6 +136,7 @@ class Robot():
         """
         self.px, self.py = next_position[0], next_position[1]
         self.ranger_reflections = self.get_ranger_reflections(segments)
+        # TODO: add vx, vy to full state space
         # self.vf makes no sense in this action space
         #return self.get_observable_state()
         return self.observe()

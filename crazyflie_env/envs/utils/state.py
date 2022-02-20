@@ -38,9 +38,7 @@ class ObservableState():
         self.orientation = orientation
         self.ranger_reflections = ranger_reflections
 
-        self.state_tuple = (self.goal_distance, self.orientation,
-                            self.ranger_reflections[0], self.ranger_reflections[1],
-                            self.ranger_reflections[2], self.ranger_reflections[3])
+        self.state_tuple = (self.goal_distance, self.orientation, *[ref for ref in self.ranger_reflections])
     
     def __add__(self, other):
         return other + self.state_tuple
