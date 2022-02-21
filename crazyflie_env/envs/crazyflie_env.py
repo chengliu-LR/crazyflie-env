@@ -25,7 +25,7 @@ class CrazyflieEnv(gym.Env):
         self.random_init = True # randomly initialize robot position
         self.robot_po = True # partial observability of the robot
         self.random_obstacle = True
-        self.obstacle_num = 0
+        self.obstacle_num = None
         self._set_robot(Robot(self.robot_po))
 
         # # reward function
@@ -62,8 +62,8 @@ class CrazyflieEnv(gym.Env):
         self.left_wall = (self.BOTTOM_LEFT[0], self.BOTTOM_LEFT[1], self.UP_LEFT[0], self.UP_LEFT[1])
         self.walls = [self.front_wall, self.right_wall, self.back_wall, self.left_wall] # ((x1, y1), (x1', y1'))
 
-        self.obstacles = self.generate_obstacles(random_position=self.random_obstacle, obstacle_num=self.obstacle_num)
-        self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
+        #self.obstacles = self.generate_obstacles(random_position=self.random_obstacle, obstacle_num=self.obstacle_num)
+        #self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
 
         # visualization, store full state of the robot
         self.states = None
@@ -72,6 +72,10 @@ class CrazyflieEnv(gym.Env):
     def _set_robot(self, robot):
         self.robot = robot
         self.robot.time_step = self.time_step
+
+
+    def set_obstacle_num(self, num):
+        self.obstacle_num = num
 
 
     def obstacles2segments(self, obstacles=[]):
@@ -134,7 +138,7 @@ class CrazyflieEnv(gym.Env):
         else:
             # TODO: possible region where obstacle can exist (excluding goal and start region)
             # TODO: choose density of the obstacles (increase as learning goes on)
-            poses = [np.random.uniform(low=(-2.5, -2.5), high=(2.5, 2), size=(2,)) for _ in range(obstacle_num)]
+            poses = [np.random.uniform(low=(-1, -2.5), high=(1, 2), size=(2,)) for _ in range(obstacle_num)]
             wxs = [np.random.uniform(low=0.4, high=1.0) for _ in range(obstacle_num)]
             wys = [np.random.uniform(low=0.2, high=0.4) for _ in range(obstacle_num)]
             angles = [0 for i in range(obstacle_num)]
@@ -161,7 +165,7 @@ class CrazyflieEnv(gym.Env):
             self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
             too_close = True
             while too_close:
-                initial_position = np.random.uniform(low=(-3.5, -3.5), high=(3.5, 3.5), size=(2,))
+                initial_position = np.random.uniform(low=(-2.0, -3.5), high=(2.0, 3.5), size=(2,))
                 too_close, _ = self.check_far_enough(initial_position)
             assert too_close is False
             #initial_orientation = np.random.uniform(0.0, 2 * np.pi)
