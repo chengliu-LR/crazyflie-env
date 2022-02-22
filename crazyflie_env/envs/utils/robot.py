@@ -14,7 +14,7 @@ class Robot():
         self.time_step = None
         self.fov = 2 * np.pi
         self.num_rangers = 4
-        self.max_ranger_dist = 3.0
+        self.max_ranger_dist = 4.0
         #self.ranger_to_central = 0.012 # ranger to central distance
         self.partial_observation = partial_observation
 

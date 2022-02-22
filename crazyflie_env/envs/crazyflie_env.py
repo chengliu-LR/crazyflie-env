@@ -26,6 +26,7 @@ class CrazyflieEnv(gym.Env):
         self.robot_po = True # partial observability of the robot
         self.random_obstacle = True
         self.obstacle_num = None
+        self.training_stage = 'first'
         self._set_robot(Robot(self.robot_po))
 
         # # reward function
@@ -38,7 +39,7 @@ class CrazyflieEnv(gym.Env):
 
         # reward function
         self.success_reward = 50.0
-        self.collision_penalty = -30.0
+        self.collision_penalty = -25.0
         #self.goal_dist_reward_factor = 1.0
         #self.rotation_penalty_factor = -0.0
         self.step_penalty = -0.1
@@ -72,6 +73,10 @@ class CrazyflieEnv(gym.Env):
     def _set_robot(self, robot):
         self.robot = robot
         self.robot.time_step = self.time_step
+
+
+    def set_training_stage(self, training_stage):
+        self.training_stage = training_stage
 
 
     def enable_random_obstacle(self, enabled):
@@ -118,8 +123,8 @@ class CrazyflieEnv(gym.Env):
 
         for i, segment in enumerate(self.obstacle_segments):
             xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:])
-            # make sure robot is intially set at 0.4m away from any obstacles
-            closet_dist = point_to_segment_dist(xy_start, xy_end, position) - 8 * self.robot.radius
+            # make sure robot is intially set at 1m away from any obstacles
+            closet_dist = point_to_segment_dist(xy_start, xy_end, position) - 20 * self.robot.radius
 
             if closet_dist <= 0.0:
                 too_close = True
@@ -130,33 +135,35 @@ class CrazyflieEnv(gym.Env):
         return too_close, dist_min
 
 
-    def generate_obstacles(self, random_position, obstacle_num, obstacle_shape='Rectangle'):
+    def generate_obstacles(self, random_position, obstacle_num, training_stage='first'):
         obstacles = []
-        if random_position == False:
+        if not random_position:
             # set obstacles with given position, shape, and angles
             poses = [(0, -1.5), (0.5, 0.5), (-0.5, 2), (-1.5, 1)]
             wxs = [1, 1.5, 1.5, 1]
             wys = [1, 0.5, 0.5, 0.5]
             angles = [0 for _ in range(4)]
         else:
-            # TODO: possible region where obstacle can exist (excluding goal and start region)
-            # TODO: choose density of the obstacles (increase as learning goes on)
-            poses = [np.random.uniform(low=(-1, -2.5), high=(1, 2), size=(2,)) for _ in range(obstacle_num)]
-            wxs = [np.random.uniform(low=0.4, high=1.0) for _ in range(obstacle_num)]
-            wys = [np.random.uniform(low=0.2, high=0.4) for _ in range(obstacle_num)]
-            angles = [0 for i in range(obstacle_num)]
+            if training_stage == 'second':
+                obstacle_num = 2 * obstacle_num
+            random_obstacle_num = np.random.randint(max(0, obstacle_num - 4), obstacle_num + 1)
+            poses = [np.random.uniform(low=(-3, -2.5), high=(3, 1.5), size=(2,)) for _ in range(random_obstacle_num)]
+            wxs = [np.random.uniform(low=0.4, high=1.0) for _ in range(random_obstacle_num)]
+            wys = [np.random.uniform(low=0.2, high=0.8) for _ in range(random_obstacle_num)]
+            angles = [0 for i in range(random_obstacle_num)]
 
-        for i in range(obstacle_num):
+        for i in range(random_obstacle_num):
             obstacle = Obstacle((poses[i][0], poses[i][1]), wxs[i], wys[i], angles[i])
             obstacles.append(obstacle)
 
-        return obstacles
+        return obstacles, random_obstacle_num
 
 
     def reset(self):
         """
         Set obstacles in env.
         Set robot at (0, -goal_height) with zero initial velocity.
+        training state: 'first' or 'second'; if second, obstacle_num = obstacle_num * 2
         Return: FullState or ObservableState
         """
         self.global_time = 0
@@ -164,7 +171,7 @@ class CrazyflieEnv(gym.Env):
             raise AttributeError('Robot has to be set!')
 
         if self.random_init:
-            self.obstacles = self.generate_obstacles(random_position=self.random_obstacle, obstacle_num=self.obstacle_num)
+            self.obstacles, obs_num = self.generate_obstacles(random_position=self.random_obstacle, obstacle_num=self.obstacle_num, training_stage=self.training_stage)
             self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
             too_close = True
             while too_close:
@@ -173,15 +180,17 @@ class CrazyflieEnv(gym.Env):
             assert too_close is False
             #initial_orientation = np.random.uniform(0.0, 2 * np.pi)
             initial_orientation = 0.0
+            goal_position = np.random.uniform(low=(-0.5, 2.0), high=(0.5, 3.0), size=(2,))
         else:
             initial_position = np.array([0, -self.goal_height])
             initial_orientation = 0.0
+            goal_position = np.array([0, self.goal_height])
         
-        self.robot.set_state(initial_position[0], initial_position[1], 0, self.goal_height, 0, 0, self.obstacle_segments)
+        self.robot.set_state(initial_position[0], initial_position[1], goal_position[0], goal_position[1], 0, 0, self.obstacle_segments)
         self.states = list()
         ob = self.robot.observe()
 
-        return ob
+        return ob, obs_num
     
 
     def step(self, action, update=True):
@@ -223,7 +232,7 @@ class CrazyflieEnv(gym.Env):
         elif goal_reached:
             reward += self.success_reward
             done = True
-            info = "Goal Reached"
+            info = "Reached"
         elif dist_min < self.discomfort_dist:
             reward += (self.discomfort_dist - dist_min) * self.discomfort_penalty_factor
             done = False
@@ -268,7 +277,7 @@ class CrazyflieEnv(gym.Env):
             ax.set_ylabel('y(m)', fontsize=16)
 
             # set goal point
-            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_height],
+            goal = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy],
                                    color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
             ax.add_artist(goal)
 
@@ -351,7 +360,7 @@ class CrazyflieEnv(gym.Env):
             plot_ranger_reflections(angless=angless, ranger_reflectionss=ranger_reflectionss, frame=0)
 
             # set robot, goal pos, arrows of each robot, ranger reflections and time annotation at timestep 0
-            goal = matlines.Line2D(xdata=[0], ydata=[self.goal_height],
+            goal = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy],
                                    color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
 
             robot_ = plt.Circle(robot_positions[0], radius, fill=True, color=robot_color)

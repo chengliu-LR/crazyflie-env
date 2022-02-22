@@ -70,7 +70,7 @@ def get_intersection(a1, a2, b1, b2):
     return intersct
 
 
-def get_ranger_reflection(segments, fov=2*np.pi, n_reflections=4, max_dist=3, xytheta_robot=np.array([0.0, 0.0, 0.0])):
+def get_ranger_reflection(segments, fov=2*np.pi, n_reflections=4, max_dist=4, xytheta_robot=np.array([0.0, 0.0, 0.0])):
     """
     param segments: start and end points of all segments as ((x1,y1,x1',y1'), (x2,y2,x2',y2'), (x3,y3,x3',y3'), (...))
                     which is the return type of Obstacle().get_segments()

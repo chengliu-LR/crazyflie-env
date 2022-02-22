@@ -4,6 +4,7 @@ envs/__pycache__/
 *.egg-info/
 *.ipynb
 *.gif
+*.png
 #macOS
 .DS_Store
 .vscode
