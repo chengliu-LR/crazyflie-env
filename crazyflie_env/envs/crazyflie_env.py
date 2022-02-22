@@ -74,6 +74,10 @@ class CrazyflieEnv(gym.Env):
         self.robot.time_step = self.time_step
 
 
+    def enable_random_obstacle(self, enabled):
+        self.random_obstacle = bool(enabled)
+
+
     def set_obstacle_num(self, num):
         self.obstacle_num = num
 
@@ -97,8 +101,7 @@ class CrazyflieEnv(gym.Env):
 
         for i, segment in enumerate(self.obstacle_segments):
             xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:])
-            #closet_dist = point_to_segment_dist(xy_start, xy_end, position) - self.robot.radius
-            closet_dist = point_to_segment_dist(xy_start, xy_end, position) - 0.2 * self.robot.radius
+            closet_dist = point_to_segment_dist(xy_start, xy_end, position) - self.robot.radius
 
             if closet_dist <= 0.0:
                 collision = True
@@ -115,7 +118,7 @@ class CrazyflieEnv(gym.Env):
 
         for i, segment in enumerate(self.obstacle_segments):
             xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:])
-            # make sure robot is 0.4m away from any obstacles
+            # make sure robot is intially set at 0.4m away from any obstacles
             closet_dist = point_to_segment_dist(xy_start, xy_end, position) - 8 * self.robot.radius
 
             if closet_dist <= 0.0:
@@ -131,10 +134,10 @@ class CrazyflieEnv(gym.Env):
         obstacles = []
         if random_position == False:
             # set obstacles with given position, shape, and angles
-            poses = [(0, -1), (2, 1), (0, 0.5), (-2.5, 1)]
-            wxs = [2, 0.1, 1.5, 1]
-            wys = [0.1, 2, 0.1, 0.1]
-            angles = [0, 0, 0, 0]
+            poses = [(0, -1.5), (0.5, 0.5), (-0.5, 2), (-1.5, 1)]
+            wxs = [1, 1.5, 1.5, 1]
+            wys = [1, 0.5, 0.5, 0.5]
+            angles = [0 for _ in range(4)]
         else:
             # TODO: possible region where obstacle can exist (excluding goal and start region)
             # TODO: choose density of the obstacles (increase as learning goes on)

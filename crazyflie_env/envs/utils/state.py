@@ -33,12 +33,13 @@ class FullState():
 
 
 class ObservableState():
-    def __init__(self, goal_distance, orientation, ranger_reflections):
+    def __init__(self, position, goal_distance, orientation, ranger_reflections):
+        self.position = position
         self.goal_distance = goal_distance
         self.orientation = orientation
         self.ranger_reflections = ranger_reflections
 
-        self.state_tuple = (self.goal_distance, self.orientation, *[ref for ref in self.ranger_reflections])
+        self.state_tuple = (self.position, self.goal_distance, self.orientation, *[ref for ref in self.ranger_reflections])
     
     def __add__(self, other):
         return other + self.state_tuple

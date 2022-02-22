@@ -88,8 +88,8 @@ def get_ranger_reflection(segments, fov=2*np.pi, n_reflections=4, max_dist=3, xy
 
     for segment in segments:
         xy_start, xy_end = np.array(segment[:2]), np.array(segment[2:]) # start and end points of each segment
-        for i, theta in enumerate(ranger_angles):
-            max_xy_ranger = xy_robot + np.array([max_dist * np.cos(theta), max_dist * np.sin(theta)])
+        for i, angle in enumerate(ranger_angles):
+            max_xy_ranger = xy_robot + np.array([max_dist * np.cos(angle), max_dist * np.sin(angle)])
             intersection = get_intersection(xy_start, xy_end, xy_robot, max_xy_ranger)
             if intersection is not None:
                 radius = np.sqrt(np.sum((intersection - xy_robot) ** 2))

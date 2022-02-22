@@ -15,6 +15,7 @@ class Robot():
         self.fov = 2 * np.pi
         self.num_rangers = 4
         self.max_ranger_dist = 3.0
+        #self.ranger_to_central = 0.012 # ranger to central distance
         self.partial_observation = partial_observation
 
         self.px = None
@@ -46,10 +47,15 @@ class Robot():
     def get_ranger_reflections(self, segments):
         """
         set ranger_reflections according to obstacles in the environment
-        return np.array with shape (4,)
+        add gaussian noise (mean=0, std=0.01) to each beam
+        return np.array with shape (num_reflections,)
         """
-        return get_ranger_reflection(segments=segments, fov= self.fov, n_reflections=self.num_rangers, max_dist=self.max_ranger_dist,
+        #TODO: add noise
+        ranger_reflections = get_ranger_reflection(segments=segments, fov= self.fov, n_reflections=self.num_rangers, max_dist=self.max_ranger_dist,
                                     xytheta_robot=np.hstack((self.get_position(), self.orientation)))
+        noise = np.random.normal(0.0, 0.01, ranger_reflections.shape)
+        
+        return np.clip(ranger_reflections + noise, 0.0, self.max_ranger_dist)
 
 
     def get_full_state(self):
@@ -57,7 +63,7 @@ class Robot():
 
 
     def get_observable_state(self):
-        return ObservableState(self.get_goal_distance(), self.orientation, self.ranger_reflections)
+        return ObservableState(self.get_position(), self.get_goal_distance(), self.orientation, self.ranger_reflections)
 
 
     def observe(self):
