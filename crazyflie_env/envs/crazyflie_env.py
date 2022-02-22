@@ -139,10 +139,18 @@ class CrazyflieEnv(gym.Env):
         obstacles = []
         if not random_position:
             # set obstacles with given position, shape, and angles
-            poses = [(0, -1.5), (0.5, 0.5), (-0.5, 2), (-1.5, 1)]
-            wxs = [1, 1.5, 1.5, 1]
-            wys = [1, 0.5, 0.5, 0.5]
-            angles = [0 for _ in range(4)]
+            #obstacle_list = [[1.72, -0.06, 0.73, 0.23], [0.05, 0.2, 0.52, 0.51], [0.69, -0.91, 0.47, 0.22], [-1.71, 0.06, 0.81, 0.22], [2.07, 1.13, 0.52, 0.41], [1.36, -0.24, 0.7, 0.47]]
+            #obstacle_list = [[-2.63, 0.96, 0.4, 0.36], [-1.93, -0.31, 0.55, 0.5], [-0.12, 0.09, 0.7, 0.24], [2.68, 0.29, 0.81, 0.68], [-1.92, -0.34, 0.79, 0.37], [0.86, 1.0, 0.44, 0.26]]
+            obstacle_list = [[2.76, -0.98, 0.58, 0.44], [-0.0, -1.47, 0.63, 0.4], [1.77, -0.62, 0.4, 0.7], [0.19, 0.78, 0.85, 0.31], [-2.58, -0.56, 0.52, 0.46], [-1.48, -0.8, 0.96, 0.27], [0.83, 1.37, 0.44, 0.55]]
+            obs = [*zip(*obstacle_list)]
+            x = [ob[0] for ob in obstacle_list]
+            y = [ob[1] for ob in obstacle_list]
+            poses = [*zip(x, y)]
+            wxs = [ob[2] for ob in obstacle_list]
+            wys = [ob[3] for ob in obstacle_list]
+            angles = [0 for _ in range(len(obstacle_list))]
+            random_obstacle_num = len(obstacle_list)
+            print(random_obstacle_num)
         else:
             if training_stage == 'second':
                 obstacle_num = 2 * obstacle_num
