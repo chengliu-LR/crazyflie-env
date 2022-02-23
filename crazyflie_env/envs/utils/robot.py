@@ -88,7 +88,7 @@ class Robot():
         assert isinstance(action, ActionXY)
         px = self.px + action.vx * dt
         py = self.py + action.vy * dt
-
+        # TODO: add delay or noise into this function
         return np.array([px, py]) # implicitly return a tuple instead of two values
 
 

@@ -27,6 +27,7 @@ class CrazyflieEnv(gym.Env):
         self.random_obstacle = True
         self.obstacle_num = None
         self.training_stage = 'first'
+        self.eval = False
         self._set_robot(Robot(self.robot_po))
 
         # # reward function
@@ -46,8 +47,8 @@ class CrazyflieEnv(gym.Env):
         self.discomfort_dist = 0.2
         self.discomfort_penalty_factor = -5.0
 
-        # goal reaching radius
-        self.goal_reaching_radius = 15.0 * self.robot.radius
+        # goal reaching radius: 0.5m
+        self.goal_reaching_radius = 10 * self.robot.radius
 
         # simulation config
         self.square_width = 4.0 # half width of the square environment
@@ -77,6 +78,10 @@ class CrazyflieEnv(gym.Env):
 
     def set_training_stage(self, training_stage):
         self.training_stage = training_stage
+
+
+    def enable_eval_mode(self, eval):
+        self.eval = bool(eval)
 
 
     def enable_random_obstacle(self, enabled):
@@ -135,13 +140,14 @@ class CrazyflieEnv(gym.Env):
         return too_close, dist_min
 
 
-    def generate_obstacles(self, random_position, obstacle_num, training_stage='first'):
+    def generate_obstacles(self, random_position, obstacle_num, training_stage='first', eval=False):
         obstacles = []
         if not random_position:
             # set obstacles with given position, shape, and angles
             #obstacle_list = [[1.72, -0.06, 0.73, 0.23], [0.05, 0.2, 0.52, 0.51], [0.69, -0.91, 0.47, 0.22], [-1.71, 0.06, 0.81, 0.22], [2.07, 1.13, 0.52, 0.41], [1.36, -0.24, 0.7, 0.47]]
             #obstacle_list = [[-2.63, 0.96, 0.4, 0.36], [-1.93, -0.31, 0.55, 0.5], [-0.12, 0.09, 0.7, 0.24], [2.68, 0.29, 0.81, 0.68], [-1.92, -0.34, 0.79, 0.37], [0.86, 1.0, 0.44, 0.26]]
-            obstacle_list = [[2.76, -0.98, 0.58, 0.44], [-0.0, -1.47, 0.63, 0.4], [1.77, -0.62, 0.4, 0.7], [0.19, 0.78, 0.85, 0.31], [-2.58, -0.56, 0.52, 0.46], [-1.48, -0.8, 0.96, 0.27], [0.83, 1.37, 0.44, 0.55]]
+            #obstacle_list = [[2.76, -0.98, 0.58, 0.44], [-0.0, -1.47, 0.63, 0.4], [1.77, -0.62, 0.4, 0.7], [0.19, 0.78, 0.85, 0.31], [-2.58, -0.56, 0.52, 0.46], [-1.44, -0.8, 0.9, 0.27], [0.83, 1.37, 0.44, 0.55]]
+            obstacle_list = [[-1.91, -1.13, 0.5, 0.38], [-2.77, -0.22, 0.95, 0.42], [2.64, -1.17, 0.98, 0.51], [3.31, -0.41, 0.86, 0.38], [0.11, 0.09, 0.6, 0.59], [2.1, -2.78, 0.4, 0.45], [-1.5, -2, 0.8, 0.8], [-1.5, 2, 0.5, 0.8], [2.5, 1, 0.5, 0.38], [1.0, -1, 0.6, 0.7]]
             obs = [*zip(*obstacle_list)]
             x = [ob[0] for ob in obstacle_list]
             y = [ob[1] for ob in obstacle_list]
@@ -152,10 +158,14 @@ class CrazyflieEnv(gym.Env):
             random_obstacle_num = len(obstacle_list)
             print(random_obstacle_num)
         else:
+            old_obstacle_num = obstacle_num
             if training_stage == 'second':
                 obstacle_num = 2 * obstacle_num
-            random_obstacle_num = np.random.randint(max(0, obstacle_num - 4), obstacle_num + 1)
-            poses = [np.random.uniform(low=(-3, -2.5), high=(3, 1.5), size=(2,)) for _ in range(random_obstacle_num)]
+            if not eval:
+                random_obstacle_num = np.random.randint(max(0, obstacle_num - old_obstacle_num), obstacle_num + 1) # max for when given obstacle_num < 5
+            elif eval:
+                random_obstacle_num = self.obstacle_num # fixed number of obstacles
+            poses = [np.random.uniform(low=(-3.5, -3), high=(3.5, 1.5), size=(2,)) for _ in range(random_obstacle_num)]
             wxs = [np.random.uniform(low=0.4, high=1.0) for _ in range(random_obstacle_num)]
             wys = [np.random.uniform(low=0.2, high=0.8) for _ in range(random_obstacle_num)]
             angles = [0 for i in range(random_obstacle_num)]
@@ -179,15 +189,19 @@ class CrazyflieEnv(gym.Env):
             raise AttributeError('Robot has to be set!')
 
         if self.random_init:
-            self.obstacles, obs_num = self.generate_obstacles(random_position=self.random_obstacle, obstacle_num=self.obstacle_num, training_stage=self.training_stage)
+            self.obstacles, obs_num = self.generate_obstacles(random_position=self.random_obstacle, obstacle_num=self.obstacle_num, training_stage=self.training_stage, eval=self.eval)
             self.obstacle_segments = self.walls + self.obstacles2segments(self.obstacles) # list of segments (x1, y1, x1', y1')
             too_close = True
+
             while too_close:
                 initial_position = np.random.uniform(low=(-2.0, -3.5), high=(2.0, 3.5), size=(2,))
                 too_close, _ = self.check_far_enough(initial_position)
             assert too_close is False
             #initial_orientation = np.random.uniform(0.0, 2 * np.pi)
             initial_orientation = 0.0
+
+            if self.eval:
+                initial_position = np.array([0, -self.goal_height])
             goal_position = np.random.uniform(low=(-0.5, 2.0), high=(0.5, 3.0), size=(2,))
         else:
             initial_position = np.array([0, -self.goal_height])
