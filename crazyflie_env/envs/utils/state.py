@@ -4,9 +4,11 @@ State to describe state of your robot.
 import numpy as np
 
 class FullState():
-    def __init__(self, px, py, vf, radius, gx, gy, orientation, ranger_reflections):
+    def __init__(self, px, py, vx, vy, vf, radius, gx, gy, orientation, ranger_reflections):
         self.px = px
         self.py = py
+        self.vx = vx
+        self.vy = vy
         self.vf = vf
         self.radius = radius
         self.gx = gx
@@ -14,6 +16,7 @@ class FullState():
         self.orientation = orientation
 
         self.position = np.array([self.px, self.py])
+        self.velocity = np.array([self.vx, self.vy])
         self.goal_position = np.array([self.gx, self.gy])
 
         self.ranger_reflections = ranger_reflections
@@ -33,8 +36,9 @@ class FullState():
 
 
 class ObservableState():
-    def __init__(self, position, goal_distance, orientation, ranger_reflections):
+    def __init__(self, position, velocity, goal_distance, orientation, ranger_reflections):
         self.position = position
+        self.velocity = velocity
         self.goal_distance = goal_distance
         self.orientation = orientation
         self.ranger_reflections = ranger_reflections

@@ -20,6 +20,8 @@ class Robot():
 
         self.px = None
         self.py = None
+        self.vx = None
+        self.vy = None
         self.gx = None
         self.gy = None
         self.vf = None
@@ -27,13 +29,15 @@ class Robot():
         self.ranger_reflections = None
 
 
-    def set_state(self, px, py, gx, gy, vf, orientation, segments, radius=None):
+    def set_state(self, px, py, vx, vy, gx, gy, vf, orientation, segments, radius=None):
         """Set initial state for the robot.
         Param: (position_x, position_y, goal_pos_x, goal_pos_y, vel_forward, theta_orientation, obstacle_segments, [optional] radius).
         Param Orientation: in rads
         """
         self.px = px
         self.py = py
+        self.vx = vx
+        self.vy = vy
         self.gx = gx
         self.gy = gy
         self.vf = vf
@@ -59,11 +63,11 @@ class Robot():
 
 
     def get_full_state(self):
-        return FullState(self.px, self.py, self.vf, self.radius, self.gx, self.gy, self.orientation, self.ranger_reflections)
+        return FullState(self.px, self.py, self.vx, self.vy, self.vf, self.radius, self.gx, self.gy, self.orientation, self.ranger_reflections)
 
 
     def get_observable_state(self):
-        return ObservableState(self.get_position(), self.get_goal_distance(), self.orientation, self.ranger_reflections)
+        return ObservableState(self.get_position(), self.get_velocity(), self.get_goal_distance(), self.orientation, self.ranger_reflections)
 
 
     def observe(self):
@@ -75,6 +79,10 @@ class Robot():
 
     def get_position(self):
         return np.array([self.px, self.py])
+
+
+    def get_velocity(self):
+        return np.array([self.vx, self.vy])
 
 
     def get_goal_position(self):
@@ -141,6 +149,7 @@ class Robot():
         note that orientation and position won't be updated at same step.
         """
         self.px, self.py = next_position[0], next_position[1]
+        self.vx, self.vy = action.vx, action.vy
         self.ranger_reflections = self.get_ranger_reflections(segments)
         # TODO: add vx, vy to full state space
         # self.vf makes no sense in this action space

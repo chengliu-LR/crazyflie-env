@@ -208,7 +208,7 @@ class CrazyflieEnv(gym.Env):
             initial_orientation = 0.0
             goal_position = np.array([0, self.goal_height])
         
-        self.robot.set_state(initial_position[0], initial_position[1], goal_position[0], goal_position[1], 0, 0, self.obstacle_segments)
+        self.robot.set_state(initial_position[0], initial_position[1], 0, 0, goal_position[0], goal_position[1], 0, 0, self.obstacle_segments)
         self.states = list()
         ob = self.robot.observe()
 
