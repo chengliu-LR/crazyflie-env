@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as matlines
 from matplotlib import animation
 from matplotlib import patches
+from matplotlib.collections import LineCollection
 from crazyflie_env.envs.utils.util import point_to_segment_dist
 from crazyflie_env.envs.utils.action import ActionRotation
 from crazyflie_env.envs.utils.robot import Robot
@@ -143,11 +144,8 @@ class CrazyflieEnv(gym.Env):
     def generate_obstacles(self, random_position, obstacle_num, training_stage='first', eval=False):
         obstacles = []
         if not random_position:
-            # set obstacles with given position, shape, and angles
-            #obstacle_list = [[1.72, -0.06, 0.73, 0.23], [0.05, 0.2, 0.52, 0.51], [0.69, -0.91, 0.47, 0.22], [-1.71, 0.06, 0.81, 0.22], [2.07, 1.13, 0.52, 0.41], [1.36, -0.24, 0.7, 0.47]]
-            #obstacle_list = [[-2.63, 0.96, 0.4, 0.36], [-1.93, -0.31, 0.55, 0.5], [-0.12, 0.09, 0.7, 0.24], [2.68, 0.29, 0.81, 0.68], [-1.92, -0.34, 0.79, 0.37], [0.86, 1.0, 0.44, 0.26]]
-            #obstacle_list = [[2.76, -0.98, 0.58, 0.44], [-0.0, -1.47, 0.63, 0.4], [1.77, -0.62, 0.4, 0.7], [0.19, 0.78, 0.85, 0.31], [-2.58, -0.56, 0.52, 0.46], [-1.44, -0.8, 0.9, 0.27], [0.83, 1.37, 0.44, 0.55]]
-            obstacle_list = [[-1.91, -1.13, 0.5, 0.38], [-2.77, -0.22, 0.95, 0.42], [2.64, -1.17, 0.98, 0.51], [3.31, -0.41, 0.86, 0.38], [0.11, 0.09, 0.6, 0.59], [2.1, -2.78, 0.4, 0.45], [-1.5, -2, 0.8, 0.8], [-1.5, 2, 0.5, 0.8], [2.5, 1, 0.5, 0.38], [1.0, -1, 0.6, 0.7]]
+            # set obstacles with representive environment
+            obstacle_list = [[-1.91, -1.13, 0.5, 0.38], [-2.77, -0.22, 0.95, 0.42], [2.64, -1.17, 0.98, 0.51], [3.31, -0.41, 0.86, 0.38], [0.11, 0.09, 0.6, 0.59], [2.1, -2.78, 0.4, 0.45], [-0.8, -2, 0.8, 0.8], [-1.8, 2.0, 0.5, 0.8], [2.5, 1, 0.5, 0.38], [1.0, -1, 0.25, 0.7], [-1.7, 1.2, 1.4, 0.2]]
             obs = [*zip(*obstacle_list)]
             x = [ob[0] for ob in obstacle_list]
             y = [ob[1] for ob in obstacle_list]
@@ -156,7 +154,6 @@ class CrazyflieEnv(gym.Env):
             wys = [ob[3] for ob in obstacle_list]
             angles = [0 for _ in range(len(obstacle_list))]
             random_obstacle_num = len(obstacle_list)
-            print(random_obstacle_num)
         else:
             old_obstacle_num = obstacle_num
             if training_stage == 'second':
@@ -281,9 +278,10 @@ class CrazyflieEnv(gym.Env):
         cmap = plt.cm.get_cmap('hsv', 10)
         robot_color = 'aquamarine'
         laser_color = 'lightskyblue'
-        goal_color = 'tomato'
+        goal_color = 'tab:orange'
+        goal_area_color = 'whitesmoke'
         arrow_color = 'red'
-        obstacle_color = 'dodgerblue'
+        obstacle_color = 'steelblue'
         arrow_style = patches.ArrowStyle("simple", head_length=5, head_width=3)
 
         # for text plot around robot
@@ -298,10 +296,11 @@ class CrazyflieEnv(gym.Env):
             ax.set_xlabel('x(m)', fontsize=16)
             ax.set_ylabel('y(m)', fontsize=16)
 
-            # set goal point
-            goal = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy],
-                                   color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
+            goal = plt.Circle(self.robot.get_goal_position(), self.goal_reaching_radius, fill=True, color=goal_area_color)
+            goal_star = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy], color=goal_color, 
+                                   marker="*", linestyle='None', markersize=20, label='Goal')
             ax.add_artist(goal)
+            ax.add_artist(goal_star)
 
             # set obstacles
             obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi, color=obstacle_color) for obs in self.obstacles]
@@ -328,7 +327,7 @@ class CrazyflieEnv(gym.Env):
                                                 (self.states[k - 1].py, self.states[k].py),
                                                 color=robot_color, ls='solid')
                     ax.add_artist(nav_directions)
-            plt.legend([robot_, goal], ['Robot', 'Goal'], fontsize=16, loc='lower right', fancybox=True, framealpha=0.5)
+            plt.legend([robot_, goal_star], ['Robot', 'Goal'], fontsize=16, loc='lower right', fancybox=True, framealpha=0.5)
 
             if output_file is not None:
                 fig.savefig(output_file + '.png')
@@ -382,8 +381,9 @@ class CrazyflieEnv(gym.Env):
             plot_ranger_reflections(angless=angless, ranger_reflectionss=ranger_reflectionss, frame=0)
 
             # set robot, goal pos, arrows of each robot, ranger reflections and time annotation at timestep 0
-            goal = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy],
-                                   color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
+            goal = plt.Circle(self.robot.get_goal_position(), self.goal_reaching_radius, fill=True, color=goal_color)
+            #goal = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy],
+            #                       color=goal_color, marker="*", linestyle='None', markersize=20, label='Goal')
 
             robot_ = plt.Circle(robot_positions[0], radius, fill=True, color=robot_color)
             arrows = [patches.FancyArrowPatch(*directions_vector[0], color=arrow_color, arrowstyle=arrow_style)]
@@ -437,5 +437,65 @@ class CrazyflieEnv(gym.Env):
                 ffmpeg_writer = animation.writers['ffmpeg']
                 writer = ffmpeg_writer(fps=8, metadata=dict(artist='Me', bitrate=1800))
                 anim.save(output_file + '.gif', writer=writer)
+            else:
+                plt.show()
+    
+
+    def multi_render(self, mode='trajectory', output_file=None, tcvs=None):
+        cmap = plt.cm.get_cmap('hsv', 10)
+        robot_color = 'c'
+        goal_color = 'tomato'
+        goal_area_color = 'whitesmoke'
+        obstacle_color = 'tab:blue'
+
+        # for text plot around robot
+        x_offset = -0.33
+        y_offset = 0.11
+
+        if mode == 'trajectory':
+            fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=250)
+            ax.tick_params(labelsize=16)
+            ax.set_xlim(-self.square_width, self.square_width)
+            ax.set_ylim(-self.square_width, self.square_width)
+            ax.set_xlabel('x(m)', fontsize=16)
+            ax.set_ylabel('y(m)', fontsize=16)
+
+            goal = plt.Circle(self.robot.get_goal_position(), self.goal_reaching_radius, fill=True, color=goal_area_color)
+            goal_star = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy], color=goal_color, 
+                                   marker="*", linestyle='None', markersize=20, label='Goal')
+            ax.add_artist(goal)
+            ax.add_artist(goal_star)
+
+            # set obstacles
+            obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi, color=obstacle_color) for obs in self.obstacles]
+            for obstacle_ in obstacles_:
+                ax.add_artist(obstacle_)
+
+            # trajectory plot
+            robot_positions = np.vstack([state.position for state in self.states]).reshape(-1, 1, 2)
+            position_segments = np.concatenate([robot_positions[:-1], robot_positions[1:]], axis=1)
+            robot_velocities = np.array([np.sqrt(state.velocity[0] ** 2 + state.velocity[1] ** 2) for state in self.states]) # has to be np array, not list
+            tcvs = np.array(tcvs)
+
+            lc = LineCollection(position_segments, cmap='winter') # 'viridis' or 'winter'
+            # Set the values used for colormapping
+            lc.set_array(tcvs)
+            lc.set_linewidth(2)
+            line = ax.add_collection(lc)
+
+            for k in [0, -1]:
+                robot_ = plt.Circle(self.states[k].position, self.robot.radius, fill=True, color=robot_color)
+                global_time = 0.0 if k == 0 else self.global_time
+                times = plt.text(robot_.center[0] - x_offset, robot_.center[1] - y_offset, 'time: {:.1f}'.format(global_time), fontsize=14)
+                ax.add_artist(robot_)
+                ax.add_artist(times)
+
+            plt.legend([robot_, goal_star], ['Robot', 'Goal'], fontsize=16, loc='lower left', fancybox=True, framealpha=0.5)
+            cax = plt.axes([0.92, 0.2, 0.025, 0.6])
+            fig.colorbar(line, cax=cax)
+            #plt.legend([robot_, goal_star], ['Robot', 'Goal'], fontsize=16, loc='lower right', fancybox=True, framealpha=0.5)
+
+            if output_file is not None:
+                fig.savefig(output_file + '.png')
             else:
                 plt.show()
