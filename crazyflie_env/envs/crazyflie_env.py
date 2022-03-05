@@ -441,7 +441,7 @@ class CrazyflieEnv(gym.Env):
                 plt.show()
     
 
-    def multi_render(self, mode='trajectory', output_file=None, tcvs=None):
+    def multi_render(self, mode='trajectory', output_file=None, tcvs=None, cvars=None):
         cmap = plt.cm.get_cmap('hsv', 10)
         robot_color = 'c'
         goal_color = 'tomato'
@@ -449,8 +449,8 @@ class CrazyflieEnv(gym.Env):
         obstacle_color = 'tab:blue'
 
         # for text plot around robot
-        x_offset = -0.33
-        y_offset = 0.11
+        x_offset = -0.0
+        y_offset = 0.0
 
         if mode == 'trajectory':
             fig, ax = plt.subplots(figsize=(7, 7), facecolor='white', dpi=250)
@@ -475,21 +475,29 @@ class CrazyflieEnv(gym.Env):
             robot_positions = np.vstack([state.position for state in self.states]).reshape(-1, 1, 2)
             position_segments = np.concatenate([robot_positions[:-1], robot_positions[1:]], axis=1)
             robot_velocities = np.array([np.sqrt(state.velocity[0] ** 2 + state.velocity[1] ** 2) for state in self.states]) # has to be np array, not list
-            tcvs = np.array(tcvs)
 
             lc = LineCollection(position_segments, cmap='winter') # 'viridis' or 'winter'
             # Set the values used for colormapping
-            lc.set_array(tcvs)
+            colormap = np.array(tcvs)
+            lc.set_array(colormap)
             lc.set_linewidth(2)
             line = ax.add_collection(lc)
 
-            for k in [0, -1]:
-                robot_ = plt.Circle(self.states[k].position, self.robot.radius, fill=True, color=robot_color)
-                global_time = 0.0 if k == 0 else self.global_time
-                times = plt.text(robot_.center[0] - x_offset, robot_.center[1] - y_offset, 'time: {:.1f}'.format(global_time), fontsize=14)
-                ax.add_artist(robot_)
-                ax.add_artist(times)
+            
+            for k in range(len(self.states)):
+                # plot time in seconds
+                global_time = k * self.time_step
+                if global_time % 2 == 0 or k == len(self.states) - 1:
+                    if k == len(self.states) - 1:
+                        font_size = 18
+                    else:
+                        font_size = 16
+                    times = plt.text(self.states[k].position[0] - x_offset, self.states[k].position[1] - y_offset, '{:.1f}'.format(global_time), fontsize=font_size)
+                    ax.add_artist(times)
 
+            robot_ = matlines.Line2D(xdata=[self.robot.px], ydata=[self.robot.py], color=robot_color, 
+                                        marker=".", linestyle='None', markersize=18, label='Start Point')
+            ax.add_artist(robot_)
             plt.legend([robot_, goal_star], ['Robot', 'Goal'], fontsize=16, loc='lower left', fancybox=True, framealpha=0.5)
             cax = plt.axes([0.92, 0.2, 0.025, 0.6])
             fig.colorbar(line, cax=cax)
@@ -499,3 +507,162 @@ class CrazyflieEnv(gym.Env):
                 fig.savefig(output_file + '.png')
             else:
                 plt.show()
+
+
+    def multi_plot(self, loggers=None, output_file=None, tcvs=None, cvars=None):
+        cmap = plt.cm.get_cmap('hsv', 10)
+        robot_color = 'c'
+        goal_color = 'tomato'
+        goal_area_color = 'whitesmoke'
+        obstacle_color = 'tab:blue'
+
+        # for text plot around robot
+        x_offset = -0.0
+        y_offset = -0.0
+
+        figure_mosaic = [['(a) Risk-Neutral (CVaR=1.0)', '(b) CVaR=0.75'], ['(c) CVaR=0.5','(d) CVaR=0.25'], ['(e) CVaR=0.1', '(f) ART-IQN']]
+        fig, axes = plt.subplots(3, 2, figsize=(15, 24.5), dpi=250)
+        #fig, axes = plt.subplot_mosaic(layout=figure_mosaic, figsize=(25, 15), dpi=500)
+        for i in range(3):
+            for j in range(2):
+                label = figure_mosaic[i][j]
+                logger = loggers[i * 2 + j]
+                print(label)
+                axes[i][j].axis('square')
+                axes[i][j].set_title(label, size=24)
+                axes[i][j].tick_params(labelsize=18)
+                axes[i][j].set_xticks(np.arange(-4,5,1))
+                axes[i][j].set_yticks(np.arange(-4,5,1))
+                axes[i][j].set_xlim(-self.square_width, self.square_width)
+                axes[i][j].set_ylim(-self.square_width, self.square_width)
+                axes[i][j].set_xlabel('x(m)', fontsize=22)
+                axes[i][j].set_ylabel('y(m)', fontsize=22)
+
+                goal = plt.Circle(self.robot.get_goal_position(), self.goal_reaching_radius, fill=True, color=goal_area_color)
+                goal_star = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy], color=goal_color, 
+                                        marker="*", linestyle='None', markersize=14, label='Goal Point')
+                axes[i][j].add_artist(goal)
+                axes[i][j].add_artist(goal_star)
+
+                # set obstacles
+                obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi, color=obstacle_color) for obs in self.obstacles]
+                for obstacle_ in obstacles_:
+                    axes[i][j].add_artist(obstacle_)
+
+                # trajectory plot
+                robot_positions = np.vstack([state.position for state in logger['state']]).reshape(-1, 1, 2)
+                position_segments = np.concatenate([robot_positions[:-1], robot_positions[1:]], axis=1)
+                robot_velocities = np.array([np.sqrt(state.velocity[0] ** 2 + state.velocity[1] ** 2) for state in logger['state']]) # has to be np array, not list
+
+                lc = LineCollection(position_segments, cmap='winter') # 'viridis' or 'winter'
+                # Set the values used for colormapping
+                colormap = np.array(robot_velocities)
+                lc.set_array(colormap)
+                lc.set_linewidth(3)
+                line = axes[i][j].add_collection(lc)
+
+                #robot_ = plt.Circle(logger['state'][k].position, 1.2 * self.robot.radius, fill=True, color=robot_color)
+                robot_ = matlines.Line2D(xdata=[self.robot.px], ydata=[self.robot.py], color=robot_color, 
+                                        marker=".", linestyle='None', markersize=18, label='Start Point')
+                axes[i][j].add_artist(robot_)
+
+                if i * 2 + j != 5:
+                    #times = plt.text(logger['state'][-1].position[0] - x_offset, logger['state'][-1].position[1] - y_offset, '{:.1f}'.format(logger['global_time']), fontsize=14)
+                    axes[i][j].text(logger['state'][-1].position[0] - x_offset, logger['state'][-1].position[1] - y_offset, '{:.1f}'.format(logger['global_time']), fontsize=18)
+                else:
+                    for k in range(len(logger['state'])):
+                        # plot time in seconds
+                        global_time = k * self.time_step
+                        if global_time % 2 == 0 or k == len(logger['state']) - 1:
+                            if k == len(logger['state']) - 1:
+                                times = plt.text(logger['state'][k].position[0] - x_offset, logger['state'][k].position[1] - y_offset, '{:.1f}'.format(global_time), fontsize=18)
+                            else:
+                                times = plt.text(logger['state'][k].position[0] - x_offset, logger['state'][k].position[1] - y_offset, '{:.1f}'.format(global_time), fontsize=16)
+                            axes[i][j].add_artist(times)
+                    plt.legend([robot_, goal_star], ['Start', 'Goal'], fontsize=22, loc='lower right', fancybox=True, framealpha=0.9)
+
+        cax = plt.axes([0.31, 0.068, 0.40, 0.01]) # [left, bottom, width, height]
+        cbar = fig.colorbar(line, cax = cax, orientation='horizontal')
+        cbar.ax.tick_params(labelsize=18)
+        cbar.set_label('Velocity (m/s)', fontsize=22)
+
+        if output_file is not None:
+            fig.savefig(output_file + '.png', bbox_inches='tight')
+        # else:
+        #     plt.show()
+
+
+    def adaptive_plot(self, loggers=None, output_file=None, tcvs=None, cvars=None):
+        cmap = plt.cm.get_cmap('hsv', 10)
+        robot_color = 'c'
+        goal_color = 'tomato'
+        goal_area_color = 'whitesmoke'
+        obstacle_color = 'tab:blue'
+
+        # for text plot around robot
+        x_offset = -0.0
+        y_offset = -0.0
+
+        figure_mosaic = ['TCV-EWAF']
+        fig, axes = plt.subplots(1, 1, figsize=(7.5, 8), dpi=500)
+        #fig, axes = plt.subplot_mosaic(layout=figure_mosaic, figsize=(25, 15), dpi=500)
+        label = figure_mosaic[0]
+        logger = loggers[-1]
+        print(label)
+        axes.axis('square')
+        axes.set_title(label, size=24)
+        axes.tick_params(labelsize=18)
+        axes.set_xticks(np.arange(-4,5,1))
+        axes.set_yticks(np.arange(-4,5,1))
+        axes.set_xlim(-self.square_width, self.square_width)
+        axes.set_ylim(-self.square_width, self.square_width)
+        axes.set_xlabel('x(m)', fontsize=22)
+        axes.set_ylabel('y(m)', fontsize=22)
+
+        goal = plt.Circle(self.robot.get_goal_position(), self.goal_reaching_radius, fill=True, color=goal_area_color)
+        goal_star = matlines.Line2D(xdata=[self.robot.gx], ydata=[self.robot.gy], color=goal_color, 
+                                marker="*", linestyle='None', markersize=14, label='Goal Point')
+        axes.add_artist(goal)
+        axes.add_artist(goal_star)
+
+        # set obstacles
+        obstacles_ = [patches.Rectangle(obs.bl_anchor_point(), obs.wx, obs.wy, obs.angle * 180. / np.pi, color=obstacle_color) for obs in self.obstacles]
+        for obstacle_ in obstacles_:
+            axes.add_artist(obstacle_)
+
+        # trajectory plot
+        robot_positions = np.vstack([state.position for state in logger['state']]).reshape(-1, 1, 2)
+        position_segments = np.concatenate([robot_positions[:-1], robot_positions[1:]], axis=1)
+        robot_velocities = np.array([np.sqrt(state.velocity[0] ** 2 + state.velocity[1] ** 2) for state in logger['state']]) # has to be np array, not list
+
+        lc = LineCollection(position_segments, cmap='winter') # 'viridis' or 'winter'
+        # Set the values used for colormapping
+        colormap = np.array(tcvs)
+        lc.set_array(colormap)
+        lc.set_linewidth(3)
+        line = axes.add_collection(lc)
+
+        #robot_ = plt.Circle(logger['state'][k].position, 1.2 * self.robot.radius, fill=True, color=robot_color)
+        robot_ = matlines.Line2D(xdata=[self.robot.px], ydata=[self.robot.py], color=robot_color, 
+                                marker=".", linestyle='None', markersize=18, label='Start Point')
+        axes.add_artist(robot_)
+        for k in range(len(logger['state'])):
+            # plot time in seconds
+            global_time = k * self.time_step
+            if global_time % 2 == 0 or k == len(logger['state']) - 1:
+                if k == len(logger['state']) - 1:
+                    times = plt.text(logger['state'][k].position[0] - x_offset, logger['state'][k].position[1] - y_offset, '{:.1f}'.format(global_time), fontsize=18)
+                else:
+                    times = plt.text(logger['state'][k].position[0] - x_offset, logger['state'][k].position[1] - y_offset, '{:.1f}'.format(global_time), fontsize=16)
+                axes.add_artist(times)
+            plt.legend([robot_, goal_star], ['Start', 'Goal'], fontsize=22, loc='lower right', fancybox=True, framealpha=0.9)
+
+        cax = plt.axes([0.92, 0.2, 0.025, 0.6])
+        cbar = fig.colorbar(line, cax = cax, orientation='vertical')
+        cbar.ax.tick_params(labelsize=18)
+        cbar.set_label('Tail Conditional Variance', fontsize=22)
+
+        if output_file is not None:
+            fig.savefig(output_file + '.png', bbox_inches='tight')
+        # else:
+        #     plt.show()
